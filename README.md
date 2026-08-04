@@ -1,4 +1,4 @@
-# VotaCoop — Plataforma de Votación y Gobernanza para Organizaciones
+# JDS — Plataforma de Votación y Gobernanza para Organizaciones
 
 Sistema de votación electrónica diseñado para asambleas de copropietarios, cooperativas y organizaciones con estructuras de gobernanza participativa, donde cada miembro posee un peso de voto proporcional a su participación (ej. coeficiente de copropiedad, aportes societarios, etc.).
 
