@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,13 @@ class Settings(BaseSettings):
     db_password: str = ""
     db_encrypt: str = "yes"
     db_trust_server_certificate: str = "yes"
+
+    # Autenticacion (JWT). No hay valor por defecto a proposito: si falta en
+    # el .env la API no arranca, en vez de arrancar con un secreto adivinable.
+    # Generar uno con: python -c "import secrets; print(secrets.token_hex(32))"
+    jwt_secret: str = Field(min_length=32)
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480
 
     @property
     def sqlalchemy_url(self) -> str:

@@ -4,6 +4,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.db import get_connection
 from app.schemas import (
+    MiembroSesion,
     OpcionResultado,
     OpcionVoto,
     ResultadoVotacion,
@@ -12,14 +13,31 @@ from app.schemas import (
     VotoConfirmacion,
     VotoCrear,
 )
+from app.security import get_current_member
 
 router = APIRouter(prefix="/votaciones", tags=["votaciones"])
 
 
+def _exigir_votacion_de_mi_organizacion(
+    conn: Connection, votacion_id: int, actual: MiembroSesion
+) -> None:
+    """404 si la votacion no existe o es de otra organizacion.
+
+    Se responde igual en ambos casos para no revelar que ids existen en
+    otras organizaciones.
+    """
+    org_id = conn.execute(
+        text("SELECT OrganizacionId FROM Votaciones WHERE VotacionId = :votacion_id"),
+        {"votacion_id": votacion_id},
+    ).scalar()
+    if org_id is None or org_id != actual.organizacion_id:
+        raise HTTPException(status_code=404, detail="Votación no encontrada")
+
+
 @router.get("", response_model=list[VotacionResumen])
 def listar_votaciones(
-    organizacion_id: int,
     conn: Connection = Depends(get_connection),
+    actual: MiembroSesion = Depends(get_current_member),
 ) -> list[VotacionResumen]:
     rows = conn.execute(
         text(
@@ -30,7 +48,7 @@ def listar_votaciones(
             ORDER BY FechaApertura DESC
             """
         ),
-        {"organizacion_id": organizacion_id},
+        {"organizacion_id": actual.organizacion_id},
     ).mappings()
 
     return [
@@ -50,7 +68,9 @@ def listar_votaciones(
 def obtener_votacion(
     votacion_id: int,
     conn: Connection = Depends(get_connection),
+    actual: MiembroSesion = Depends(get_current_member),
 ) -> VotacionDetalle:
+    _exigir_votacion_de_mi_organizacion(conn, votacion_id, actual)
     votacion = conn.execute(
         text(
             """
@@ -88,7 +108,9 @@ def obtener_votacion(
 def obtener_resultado(
     votacion_id: int,
     conn: Connection = Depends(get_connection),
+    actual: MiembroSesion = Depends(get_current_member),
 ) -> ResultadoVotacion:
+    _exigir_votacion_de_mi_organizacion(conn, votacion_id, actual)
     row = conn.execute(
         text("SELECT * FROM vw_ResultadosYQuorum WHERE VotacionId = :votacion_id"),
         {"votacion_id": votacion_id},
@@ -161,15 +183,20 @@ def registrar_voto(
     votacion_id: int,
     voto: VotoCrear,
     conn: Connection = Depends(get_connection),
+    actual: MiembroSesion = Depends(get_current_member),
 ) -> VotoConfirmacion:
+    # Quien vota es el dueño del token, nunca un id enviado por el cliente.
     # La validación de ventana de tiempo, pertenencia de la opción y el
     # bloqueo de doble voto (constraint UNIQUE) viven en sp_RegistrarVoto,
     # no aquí: esta capa solo traduce el resultado del SP a HTTP.
     try:
         with conn.begin():
+            # Dentro del begin(): una consulta previa fuera de el abriria una
+            # transaccion implicita y conn.begin() fallaria.
+            _exigir_votacion_de_mi_organizacion(conn, votacion_id, actual)
             result = conn.execute(
                 text("EXEC sp_RegistrarVoto @VotacionId=:vid, @MiembroId=:mid, @OpcionId=:oid"),
-                {"vid": votacion_id, "mid": voto.miembro_id, "oid": voto.opcion_id},
+                {"vid": votacion_id, "mid": actual.miembro_id, "oid": voto.opcion_id},
             )
             mensaje = result.mappings().first()
     except DBAPIError as exc:

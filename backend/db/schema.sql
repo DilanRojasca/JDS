@@ -27,7 +27,12 @@ CREATE TABLE Miembros (
     OrganizacionId INT NOT NULL FOREIGN KEY REFERENCES Organizaciones(OrganizacionId),
     Identificacion NVARCHAR(50) NOT NULL,
     Nombre NVARCHAR(100) NOT NULL,
-    PesoVoto DECIMAL(10, 4) NOT NULL DEFAULT 1.0000
+    PesoVoto DECIMAL(10, 4) NOT NULL DEFAULT 1.0000,
+    -- Hash bcrypt de la contraseña (nunca la contraseña en claro).
+    -- NULL = el miembro todavia no tiene acceso a la plataforma.
+    PasswordHash NVARCHAR(255) NULL,
+    -- La identificacion es el usuario de login, por eso debe ser unica.
+    CONSTRAINT UQ_Miembros_Identificacion UNIQUE (Identificacion)
 );
 
 CREATE TABLE Votaciones (

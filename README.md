@@ -61,6 +61,29 @@ El proyecto busca construir una plataforma que permita:
 - Necesita **trazabilidad y auditoría**, lo que implica modelar historación de datos y no solo su estado actual.
 - Potencialmente **multi-tenant** (varias organizaciones en la misma base de datos), lo que agrega una capa adicional de aislamiento y modelado de datos.
 
+## Autenticación (login)
+
+**Comportamiento:**
+
+- El miembro inicia sesión con su **Identificación** (cédula/NIT) y una **contraseña**. Las contraseñas se guardan solo como hash bcrypt (`Miembros.PasswordHash`); un miembro sin hash no puede ingresar.
+- Al ingresar, la API entrega un token JWT (vigencia 8 h, configurable con `JWT_EXPIRE_MINUTES`) que el frontend envía como `Authorization: Bearer ...`.
+- Todos los endpoints exigen token, excepto `GET /health` y `POST /auth/login`. `GET /auth/me` devuelve el miembro de la sesión.
+- **Quién vota lo decide el token, no el cliente**: `POST /votaciones/{id}/votos` recibe solo `opcion_id`; el `miembro_id` sale de la sesión. Ningún miembro puede votar a nombre de otro.
+- **Aislamiento por organización**: un miembro solo ve y vota en votaciones de su organización (una votación ajena responde 404).
+- Login fallido responde siempre lo mismo (“Identificación o contraseña incorrectos”), exista o no la identificación.
+
+**Puesta en marcha:**
+
+1. `pip install -r requirements.txt` (en `backend/`).
+2. Crear `backend/.env` a partir de `.env.example` y definir `JWT_SECRET` (obligatorio, mínimo 32 caracteres): `python -c "import secrets; print(secrets.token_hex(32))"`. Sin él la API no arranca.
+3. Base de datos:
+   - **BD nueva:** ejecutar `db/schema.sql` y luego `db/seed.sql`. Los 5 miembros del seed entran con su identificación (p. ej. `52104887`) y la clave de desarrollo `votacoop123`.
+   - **BD ya existente:** ejecutar `db/migracion_login.sql` y asignar una clave a cada miembro con `python -m scripts.set_password <identificacion>`.
+
+**Pruebas:** `pip install -r requirements-dev.txt` y `python -m pytest` (usan SQLite en memoria; no requieren SQL Server).
+
+**Fuera de alcance por ahora:** roles (administrador, auditor), límite de intentos de login, recuperación/cambio de contraseña desde la interfaz. La `Identificacion` es única en toda la plataforma (un mismo miembro no puede estar en dos organizaciones).
+
 ## Uso de IA
 
 Este proyecto adopta **Spec-Driven Development (SDD)** como metodología de trabajo con asistentes de IA: la especificación es la fuente de verdad, y el código es un artefacto derivado de esa especificación, no al revés.

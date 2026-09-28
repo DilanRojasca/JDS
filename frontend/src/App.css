@@ -29,6 +29,7 @@ body {
 
 .app-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 16px;
   padding: 16px 32px;
@@ -46,13 +47,29 @@ body {
   font-size: 14px;
 }
 
-.miembro-select {
+.header-user {
   margin-left: auto;
-  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.header-user-peso {
+  color: #b7c4bb;
+}
+
+.logout-button {
+  padding: 6px 12px;
   border-radius: 6px;
   border: 1px solid #2f4a3d;
   background: #223a2f;
   color: #fff;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background: #2b4a3c;
 }
 
 .app-main {
@@ -399,4 +416,86 @@ body {
   height: 100%;
   border-radius: 999px;
   transition: width 0.4s ease;
+}
+
+/* ---- Login ---- */
+
+.app-loading {
+  padding: 32px;
+  color: var(--muted);
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-brand {
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--primary-dark);
+}
+
+.login-subtitle {
+  margin: -8px 0 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+
+.field input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+
+.login-card .primary-button {
+  align-self: stretch;
+}
+
+.aviso-text {
+  margin: 0;
+  font-size: 14px;
+  color: #93501e;
+  background: #fbeadd;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.login-card .error-text {
+  margin: 0;
+  font-size: 14px;
 }

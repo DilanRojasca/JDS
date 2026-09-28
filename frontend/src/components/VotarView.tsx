@@ -34,7 +34,7 @@ export function VotarView({ votacionId, miembro, onVolver }: Props) {
     setEnviando(true);
     setError(null);
     try {
-      const res = await registrarVoto(votacionId, miembro.miembro_id, opcionId);
+      const res = await registrarVoto(votacionId, opcionId);
       setMensaje(res.mensaje);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar el voto");

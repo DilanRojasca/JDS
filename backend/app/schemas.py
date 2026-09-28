@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Organizacion(BaseModel):
@@ -12,6 +12,22 @@ class Miembro(BaseModel):
     miembro_id: int
     nombre: str
     peso_voto: float
+
+
+class MiembroSesion(Miembro):
+    organizacion_id: int
+    organizacion_nombre: str
+
+
+class LoginCrear(BaseModel):
+    identificacion: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class LoginRespuesta(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    miembro: MiembroSesion
 
 
 class OpcionVoto(BaseModel):
@@ -56,7 +72,7 @@ class ResultadoVotacion(BaseModel):
 
 
 class VotoCrear(BaseModel):
-    miembro_id: int
+    # El miembro NO viene en el body: se toma del token de sesion.
     opcion_id: int
 
 
