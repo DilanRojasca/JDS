@@ -10,6 +10,7 @@ import {
   type MiembroSesion,
   type VotacionResumen,
 } from "./api";
+import { CambiarPasswordView } from "./components/CambiarPasswordView";
 import { LoginView } from "./components/LoginView";
 import { VotacionesList } from "./components/VotacionesList";
 import { VotarView } from "./components/VotarView";
@@ -38,6 +39,12 @@ function App() {
     setAviso(null);
     setError(null);
     setVista({ tipo: "lista" });
+
+    // Con clave temporal (el documento) el resto de la API responde 403
+    // hasta que el miembro defina una clave propia: no hay votaciones que
+    // cargar todavia, CambiarPasswordView se encarga de lo siguiente.
+    if (miembro.debe_cambiar_password) return;
+
     setCargando(true);
     try {
       setVotaciones(await listarVotaciones());
@@ -92,6 +99,15 @@ function App() {
 
   if (!sesion) {
     return <LoginView onLogin={entrar} aviso={aviso} />;
+  }
+
+  if (sesion.debe_cambiar_password) {
+    return (
+      <CambiarPasswordView
+        nombre={sesion.nombre}
+        onCambiada={() => entrar({ ...sesion, debe_cambiar_password: false })}
+      />
+    );
   }
 
   return (

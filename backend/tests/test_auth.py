@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.security import hash_password, verify_password
-from tests.conftest import PASSWORD, login
+from tests.conftest import PASSWORD, PASSWORD_ANA_B, login
 
 
 def _token(sub, secret=None, exp_delta=timedelta(hours=1), alg="HS256"):
@@ -30,7 +30,9 @@ def test_login_correcto_devuelve_token_y_miembro(client):
     assert body["token_type"] == "bearer"
     assert body["miembro"]["nombre"] == "Ana"
     assert body["miembro"]["organizacion_nombre"] == "Org A"
-    assert "password" not in str(body).lower().replace("access_token", "")
+    assert body["miembro"]["debe_cambiar_password"] is False
+    cuerpo_sin_nombres_de_campo = str(body).lower().replace("access_token", "").replace("debe_cambiar_password", "")
+    assert "password" not in cuerpo_sin_nombres_de_campo
     assert "hash" not in str(body).lower()
 
 
@@ -47,19 +49,73 @@ def test_login_clave_incorrecta(client):
 
 def test_login_usuario_inexistente_da_el_mismo_error_que_clave_mala(client):
     malo = login(client, password="otra-clave")
-    fantasma = login(client, identificacion="9999")
+    fantasma = login(client, nombre="Nadie")
     assert fantasma.status_code == malo.status_code == 401
-    assert fantasma.json() == malo.json()  # no se filtra que cedulas existen
+    assert fantasma.json() == malo.json()  # no se filtra que nombres existen
 
 
-def test_miembro_sin_clave_asignada_no_puede_entrar(client):
-    assert login(client, identificacion="1003", password="").status_code == 422
-    assert login(client, identificacion="1003", password="cualquiera").status_code == 401
+# ------------------------------------------ clave temporal (documento) y homonimos
+
+def test_login_con_documento_como_clave_temporal_funciona_y_marca_cambio_obligatorio(client):
+    r = login(client, nombre="SinClave", password="1003")
+    assert r.status_code == 200
+    assert r.json()["miembro"]["debe_cambiar_password"] is True
+
+
+def test_login_temporal_rechaza_cualquier_cosa_que_no_sea_el_documento_exacto(client):
+    assert login(client, nombre="SinClave", password="1003 ").status_code == 401
+    assert login(client, nombre="SinClave", password="cualquiera").status_code == 401
+
+
+def test_debe_cambiar_password_bloquea_rutas_de_negocio_pero_no_me_ni_set_password(client):
+    token = login(client, nombre="SinClave", password="1003").json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/auth/me", headers=headers).status_code == 200
+    assert client.get("/votaciones", headers=headers).status_code == 403
+    assert client.get("/organizaciones", headers=headers).status_code == 403
+    assert client.post("/votaciones/1/votos", json={"opcion_id": 1}, headers=headers).status_code == 403
+
+    r = client.post("/auth/set-password", json={"nueva_password": "clave-nueva-123"}, headers=headers)
+    assert r.status_code == 200
+
+    # Con la clave ya definida, las rutas de negocio quedan disponibles...
+    assert client.get("/votaciones", headers=headers).status_code == 200
+    # ...y el documento deja de servir como clave: hay que usar la nueva.
+    assert login(client, nombre="SinClave", password="1003").status_code == 401
+    r2 = login(client, nombre="SinClave", password="clave-nueva-123")
+    assert r2.status_code == 200
+    assert r2.json()["miembro"]["debe_cambiar_password"] is False
+
+
+def test_set_password_exige_longitud_minima(client):
+    token = login(client, nombre="SinClave", password="1003").json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    r = client.post("/auth/set-password", json={"nueva_password": "corta"}, headers=headers)
+    assert r.status_code == 422
+
+
+def test_login_con_nombre_duplicado_se_resuelve_por_la_clave_correcta(client):
+    # Hay dos miembros llamados "Ana" (orgs distintas, claves distintas): el
+    # nombre no alcanza para identificar la cuenta, la clave si.
+    r1 = login(client, nombre="Ana", password=PASSWORD)
+    r2 = login(client, nombre="Ana", password=PASSWORD_ANA_B)
+    assert r1.status_code == r2.status_code == 200
+    assert r1.json()["miembro"]["organizacion_nombre"] == "Org A"
+    assert r2.json()["miembro"]["organizacion_nombre"] == "Org B"
+    assert r1.json()["miembro"]["miembro_id"] != r2.json()["miembro"]["miembro_id"]
+
+    # Ninguna de las dos claves de "Ana" sirve para otra cuenta.
+    assert login(client, nombre="Ana", password="clave-que-no-es-de-ninguna").status_code == 401
+
+
+def test_login_nombre_no_distingue_mayusculas_ni_espacios(client):
+    assert login(client, nombre="  ANA  ", password=PASSWORD).status_code == 200
 
 
 def test_login_valida_el_cuerpo(client):
     assert client.post("/auth/login", json={}).status_code == 422
-    assert client.post("/auth/login", json={"identificacion": "1001"}).status_code == 422
+    assert client.post("/auth/login", json={"nombre": "Ana"}).status_code == 422
 
 
 def test_clave_larga_no_revienta():

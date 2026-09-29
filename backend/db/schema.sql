@@ -151,3 +151,36 @@ GROUP BY
     V.FechaApertura,
     V.FechaCierre;
 GO
+
+-- 4. TRIGGER (Inmutabilidad post-cierre, regla de negocio #3 del README)
+-- -----------------------------------------------------------------------
+-- La API de hoy no expone ningun endpoint para editar o borrar un voto, asi
+-- que este trigger no cambia el comportamiento visible de la app. Existe
+-- como segunda linea de defensa a nivel de base de datos: si mañana alguien
+-- agrega un endpoint de "corregir voto", un script de mantenimiento, o
+-- alguien entra directo con SSMS, la regla de negocio se sigue cumpliendo
+-- aunque esa nueva capa se le olvide validarla.
+CREATE TRIGGER trg_Votos_ImpedirCambioSiCerrada
+ON Votos
+AFTER UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- "deleted" trae las filas ANTES del cambio tanto en UPDATE como en
+    -- DELETE (en un UPDATE, "inserted" trae la version nueva y "deleted" la
+    -- vieja; en un DELETE solo existe "deleted"). Alcanza con mirar
+    -- "deleted": si el voto ya pertenecia a una votacion cerrada, no importa
+    -- que se haya intentado editar o borrar, la operacion se revierte igual.
+    IF EXISTS (
+        SELECT 1
+        FROM deleted d
+        JOIN Votaciones v ON v.VotacionId = d.VotacionId
+        WHERE v.Estado = 'Cerrada'
+    )
+    BEGIN
+        ROLLBACK TRANSACTION;
+        THROW 51002, 'No se pueden modificar ni eliminar votos de una votación cerrada.', 1;
+    END
+END;
+GO

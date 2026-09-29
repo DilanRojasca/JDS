@@ -17,10 +17,18 @@ class Miembro(BaseModel):
 class MiembroSesion(Miembro):
     organizacion_id: int
     organizacion_nombre: str
+    # True mientras el miembro no haya definido una clave propia: entro con
+    # su documento como clave temporal y el resto de la API le queda
+    # bloqueada hasta llamar a POST /auth/set-password.
+    debe_cambiar_password: bool = False
 
 
 class LoginCrear(BaseModel):
-    identificacion: str = Field(min_length=1, max_length=50)
+    # El usuario de login es el nombre del miembro (no es unico: la cuenta
+    # real se resuelve validando la contraseña contra cada homonimo). La
+    # contraseña es la que el miembro definio, o su numero de documento si
+    # todavia no ha definido una (ver verify_documento_temporal).
+    nombre: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=128)
 
 
@@ -28,6 +36,14 @@ class LoginRespuesta(BaseModel):
     access_token: str
     token_type: str = "bearer"
     miembro: MiembroSesion
+
+
+class CambiarPasswordCrear(BaseModel):
+    nueva_password: str = Field(min_length=8, max_length=128)
+
+
+class MensajeRespuesta(BaseModel):
+    mensaje: str
 
 
 class OpcionVoto(BaseModel):

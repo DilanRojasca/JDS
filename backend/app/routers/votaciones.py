@@ -13,7 +13,7 @@ from app.schemas import (
     VotoConfirmacion,
     VotoCrear,
 )
-from app.security import get_current_member
+from app.security import get_current_member_activo
 
 router = APIRouter(prefix="/votaciones", tags=["votaciones"])
 
@@ -37,7 +37,7 @@ def _exigir_votacion_de_mi_organizacion(
 @router.get("", response_model=list[VotacionResumen])
 def listar_votaciones(
     conn: Connection = Depends(get_connection),
-    actual: MiembroSesion = Depends(get_current_member),
+    actual: MiembroSesion = Depends(get_current_member_activo),
 ) -> list[VotacionResumen]:
     rows = conn.execute(
         text(
@@ -68,7 +68,7 @@ def listar_votaciones(
 def obtener_votacion(
     votacion_id: int,
     conn: Connection = Depends(get_connection),
-    actual: MiembroSesion = Depends(get_current_member),
+    actual: MiembroSesion = Depends(get_current_member_activo),
 ) -> VotacionDetalle:
     _exigir_votacion_de_mi_organizacion(conn, votacion_id, actual)
     votacion = conn.execute(
@@ -108,7 +108,7 @@ def obtener_votacion(
 def obtener_resultado(
     votacion_id: int,
     conn: Connection = Depends(get_connection),
-    actual: MiembroSesion = Depends(get_current_member),
+    actual: MiembroSesion = Depends(get_current_member_activo),
 ) -> ResultadoVotacion:
     _exigir_votacion_de_mi_organizacion(conn, votacion_id, actual)
     row = conn.execute(
@@ -183,7 +183,7 @@ def registrar_voto(
     votacion_id: int,
     voto: VotoCrear,
     conn: Connection = Depends(get_connection),
-    actual: MiembroSesion = Depends(get_current_member),
+    actual: MiembroSesion = Depends(get_current_member_activo),
 ) -> VotoConfirmacion:
     # Quien vota es el dueño del token, nunca un id enviado por el cliente.
     # La validación de ventana de tiempo, pertenencia de la opción y el

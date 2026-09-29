@@ -58,7 +58,7 @@ def test_no_hay_doble_voto(client, engine, auth):
 
 
 def test_resultado_pondera_por_el_peso_de_cada_miembro(client, auth):
-    beto = {"Authorization": f"Bearer {login(client, '1002').json()['access_token']}"}
+    beto = {"Authorization": f"Bearer {login(client, 'Beto').json()['access_token']}"}
     client.post("/votaciones/1/votos", json={"opcion_id": 1}, headers=auth)   # Ana  2.0 -> A favor
     client.post("/votaciones/1/votos", json={"opcion_id": 2}, headers=beto)   # Beto 3.0 -> En contra
     r = client.get("/votaciones/1/resultado", headers=auth).json()

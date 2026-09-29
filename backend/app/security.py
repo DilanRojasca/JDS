@@ -1,3 +1,4 @@
+import hmac
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -39,6 +40,18 @@ def verify_password(password: str, password_hash: str | None) -> bool:
         return bcrypt.checkpw(_pw_bytes(password), password_hash.encode("ascii"))
     except ValueError:  # hash malformado en la BD
         return False
+
+
+# Un miembro sin PasswordHash (PasswordHash IS NULL) todavia no definio una
+# clave propia: puede entrar por unica vez usando su numero de documento
+# (Identificacion) como clave temporal. El login que lo acepta marca
+# `debe_cambiar_password=True`, y el resto de la API queda bloqueada
+# (get_current_member_activo) hasta que llame a POST /auth/set-password.
+# Es deliberadamente debil (el documento no es secreto) para permitir
+# onboarding sin que un administrador tenga que asignar claves a mano; por
+# eso el acceso real queda condicionado a fijar una clave propia de inmediato.
+def verify_documento_temporal(password: str, identificacion: str) -> bool:
+    return hmac.compare_digest(password.encode("utf-8"), identificacion.encode("utf-8"))
 
 
 def create_access_token(miembro_id: int) -> str:
@@ -88,7 +101,7 @@ def get_current_member(
         row = conn.execute(
             text(
                 """
-                SELECT m.MiembroId, m.Nombre, m.PesoVoto, m.OrganizacionId,
+                SELECT m.MiembroId, m.Nombre, m.PesoVoto, m.OrganizacionId, m.PasswordHash,
                        o.Nombre AS OrganizacionNombre
                 FROM Miembros m
                 JOIN Organizaciones o ON o.OrganizacionId = m.OrganizacionId
@@ -107,4 +120,21 @@ def get_current_member(
         peso_voto=row["PesoVoto"],
         organizacion_id=row["OrganizacionId"],
         organizacion_nombre=row["OrganizacionNombre"],
+        debe_cambiar_password=row["PasswordHash"] is None,
     )
+
+
+def get_current_member_activo(
+    miembro: MiembroSesion = Depends(get_current_member),
+) -> MiembroSesion:
+    """Igual que get_current_member, pero bloquea a quien entro con la clave
+    temporal (su documento) y todavia no definio una clave propia.
+
+    Usar en todo endpoint que no sea /auth/me o /auth/set-password.
+    """
+    if miembro.debe_cambiar_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debes definir una contraseña propia antes de continuar (POST /auth/set-password).",
+        )
+    return miembro

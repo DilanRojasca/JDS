@@ -20,5 +20,9 @@ IF NOT EXISTS (
     ALTER TABLE Miembros ADD CONSTRAINT UQ_Miembros_Identificacion UNIQUE (Identificacion);
 GO
 
--- Despues de migrar, asigna una clave a cada miembro:
+-- Despues de migrar, cada miembro con PasswordHash NULL ya puede entrar solo
+-- con su Nombre y su Identificacion/documento como clave temporal; la API lo
+-- obliga a definir una clave propia en el primer login (POST /auth/set-password).
+-- Para asignarle una clave a mano en vez de eso (por ejemplo, si el
+-- documento de alguien quedo expuesto), sigue disponible:
 --   python -m scripts.set_password <identificacion>

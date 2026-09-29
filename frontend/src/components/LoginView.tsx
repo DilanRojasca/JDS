@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function LoginView({ onLogin, aviso }: Props) {
-  const [identificacion, setIdentificacion] = useState("");
+  const [nombre, setNombre] = useState("");
   const [password, setPassword] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function LoginView({ onLogin, aviso }: Props) {
     setEnviando(true);
     setError(null);
     try {
-      const { miembro } = await login(identificacion.trim(), password);
+      const { miembro } = await login(nombre.trim(), password);
       onLogin(miembro);
     } catch (err) {
       setError(
@@ -39,15 +39,15 @@ export function LoginView({ onLogin, aviso }: Props) {
         {aviso && !error && <p className="aviso-text">{aviso}</p>}
 
         <div className="field">
-          <label htmlFor="identificacion">Identificación</label>
+          <label htmlFor="nombre">Nombre completo</label>
           <input
-            id="identificacion"
+            id="nombre"
             type="text"
             autoComplete="username"
             autoFocus
             required
-            value={identificacion}
-            onChange={(e) => setIdentificacion(e.target.value)}
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
           />
         </div>
 
@@ -61,6 +61,9 @@ export function LoginView({ onLogin, aviso }: Props) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <p className="field-help">
+            Si es tu primer ingreso, usa tu número de documento como contraseña.
+          </p>
         </div>
 
         {error && (
@@ -72,7 +75,7 @@ export function LoginView({ onLogin, aviso }: Props) {
         <button
           className="primary-button"
           type="submit"
-          disabled={enviando || !identificacion.trim() || !password}
+          disabled={enviando || !nombre.trim() || !password}
         >
           {enviando ? "Ingresando..." : "Ingresar"}
         </button>

@@ -65,24 +65,27 @@ El proyecto busca construir una plataforma que permita:
 
 **Comportamiento:**
 
-- El miembro inicia sesión con su **Identificación** (cédula/NIT) y una **contraseña**. Las contraseñas se guardan solo como hash bcrypt (`Miembros.PasswordHash`); un miembro sin hash no puede ingresar.
+- El miembro inicia sesión con su **Nombre completo** (usuario) y una **contraseña**. El nombre no es único: si hay homónimos, la cuenta real se resuelve por la contraseña correcta (cada candidato se valida por separado; la ambigüedad la rompe la clave, no el nombre).
+- **Primer ingreso:** todo miembro nuevo tiene `PasswordHash` en `NULL` y puede entrar usando su **número de documento** (`Identificacion`) como contraseña temporal. Al hacerlo, la API responde con `debe_cambiar_password: true` y bloquea el resto de los endpoints (403) hasta que llame a `POST /auth/set-password` con una contraseña propia (mínimo 8 caracteres). Una vez definida, el documento deja de servir como contraseña.
+  - Esto es una elección deliberada de UX sobre seguridad: el documento no es secreto (aparece en actas, listas de asamblea, etc.), así que solo habilita una única sesión de "onboarding" cuyo único fin es fijar una contraseña real; no queda disponible como credencial permanente.
+- Las contraseñas (la temporal exceptuada) se guardan solo como hash bcrypt (`Miembros.PasswordHash`).
 - Al ingresar, la API entrega un token JWT (vigencia 8 h, configurable con `JWT_EXPIRE_MINUTES`) que el frontend envía como `Authorization: Bearer ...`.
-- Todos los endpoints exigen token, excepto `GET /health` y `POST /auth/login`. `GET /auth/me` devuelve el miembro de la sesión.
+- Todos los endpoints exigen token, excepto `GET /health` y `POST /auth/login`. `GET /auth/me` y `POST /auth/set-password` funcionan incluso con `debe_cambiar_password: true`; el resto de la API no.
 - **Quién vota lo decide el token, no el cliente**: `POST /votaciones/{id}/votos` recibe solo `opcion_id`; el `miembro_id` sale de la sesión. Ningún miembro puede votar a nombre de otro.
 - **Aislamiento por organización**: un miembro solo ve y vota en votaciones de su organización (una votación ajena responde 404).
-- Login fallido responde siempre lo mismo (“Identificación o contraseña incorrectos”), exista o no la identificación.
+- Login fallido responde siempre lo mismo (“Nombre o contraseña incorrectos”), exista o no ese nombre.
 
 **Puesta en marcha:**
 
 1. `pip install -r requirements.txt` (en `backend/`).
 2. Crear `backend/.env` a partir de `.env.example` y definir `JWT_SECRET` (obligatorio, mínimo 32 caracteres): `python -c "import secrets; print(secrets.token_hex(32))"`. Sin él la API no arranca.
 3. Base de datos:
-   - **BD nueva:** ejecutar `db/schema.sql` y luego `db/seed.sql`. Los 5 miembros del seed entran con su identificación (p. ej. `52104887`) y la clave de desarrollo `votacoop123`.
-   - **BD ya existente:** ejecutar `db/migracion_login.sql` y asignar una clave a cada miembro con `python -m scripts.set_password <identificacion>`.
+   - **BD nueva:** ejecutar `db/schema.sql` y luego `db/seed.sql`. Los 5 miembros del seed entran con su nombre (p. ej. `Marta Gómez`) y su documento (p. ej. `52104887`) como clave temporal; la API los obliga a definir una clave propia en ese primer login.
+   - **BD ya existente:** ejecutar `db/migracion_login.sql`. Los miembros con `PasswordHash NULL` ya pueden usar el flujo de arriba sin pasos adicionales; `python -m scripts.set_password <identificacion>` sigue disponible para que un administrador asigne una clave a mano si hace falta.
 
 **Pruebas:** `pip install -r requirements-dev.txt` y `python -m pytest` (usan SQLite en memoria; no requieren SQL Server).
 
-**Fuera de alcance por ahora:** roles (administrador, auditor), límite de intentos de login, recuperación/cambio de contraseña desde la interfaz. La `Identificacion` es única en toda la plataforma (un mismo miembro no puede estar en dos organizaciones).
+**Fuera de alcance por ahora:** roles (administrador, auditor), límite de intentos de login, recuperación de contraseña olvidada desde la interfaz. La `Identificacion` es única en toda la plataforma (un mismo miembro no puede estar en dos organizaciones).
 
 ## Uso de IA
 

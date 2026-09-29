@@ -63,6 +63,7 @@ GROUP BY V.VotacionId, V.Titulo, V.QuorumRequerido, V.Estado, V.FechaApertura, V
 """
 
 PASSWORD = "clave-correcta-123"
+PASSWORD_ANA_B = "otra-clave-valida-456"  # de la segunda "Ana" (homonima, Org B)
 
 
 @pytest.fixture()
@@ -82,6 +83,7 @@ def engine():
         return statement, parameters
 
     h = hash_password(PASSWORD)
+    h_ana_b = hash_password(PASSWORD_ANA_B)
     with eng.begin() as c:
         for stmt in SCHEMA.split(";\n"):
             if stmt.strip():
@@ -93,9 +95,10 @@ def engine():
                 "(1, '1001', 'Ana',   2.0, :h),"
                 "(1, '1002', 'Beto',  3.0, :h),"
                 "(2, '2001', 'Carla', 5.0, :h),"
-                "(1, '1003', 'SinClave', 1.0, NULL)"
+                "(1, '1003', 'SinClave', 1.0, NULL),"
+                "(2, '2002', 'Ana',   4.0, :h_ana_b)"  # homonima de (1) en otra org, con otra clave
             ),
-            {"h": h},
+            {"h": h, "h_ana_b": h_ana_b},
         )
         c.execute(
             text(
@@ -124,8 +127,8 @@ def client(engine):
     app.dependency_overrides.clear()
 
 
-def login(client, identificacion="1001", password=PASSWORD):
-    return client.post("/auth/login", json={"identificacion": identificacion, "password": password})
+def login(client, nombre="Ana", password=PASSWORD):
+    return client.post("/auth/login", json={"nombre": nombre, "password": password})
 
 
 @pytest.fixture()

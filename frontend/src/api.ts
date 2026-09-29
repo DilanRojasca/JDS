@@ -57,6 +57,9 @@ export interface Miembro {
 export interface MiembroSesion extends Miembro {
   organizacion_id: number;
   organizacion_nombre: string;
+  // true mientras el miembro entro con su documento como clave temporal y
+  // todavia no definio una clave propia con cambiarPassword().
+  debe_cambiar_password: boolean;
 }
 
 export interface LoginRespuesta {
@@ -132,10 +135,10 @@ async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
-export async function login(identificacion: string, password: string): Promise<LoginRespuesta> {
+export async function login(nombre: string, password: string): Promise<LoginRespuesta> {
   const r = await apiFetch<LoginRespuesta>(
     "/auth/login",
-    { method: "POST", body: JSON.stringify({ identificacion, password }) },
+    { method: "POST", body: JSON.stringify({ nombre, password }) },
     false, // sin sesion: un 401 aqui es "credenciales malas", no "sesion vencida"
   );
   setToken(r.access_token);
@@ -143,6 +146,15 @@ export async function login(identificacion: string, password: string): Promise<L
 }
 
 export const obtenerMe = () => apiFetch<MiembroSesion>("/auth/me");
+
+// Define la clave propia del miembro autenticado. Se usa tanto para salir
+// del estado "debe_cambiar_password" (primer login con el documento) como
+// para un cambio de clave voluntario mas adelante.
+export const cambiarPassword = (nuevaPassword: string) =>
+  apiFetch<{ mensaje: string }>("/auth/set-password", {
+    method: "POST",
+    body: JSON.stringify({ nueva_password: nuevaPassword }),
+  });
 
 export const listarOrganizaciones = () => apiFetch<Organizacion[]>("/organizaciones");
 
