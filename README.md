@@ -38,7 +38,7 @@ El proyecto busca construir una plataforma que permita:
 - **Opción de voto**: alternativas disponibles dentro de una votación (ej. "A favor", "En contra", "Abstención", o candidatos en el caso de elecciones).
 - **Voto**: registro individual del voto emitido por un miembro en una votación, vinculado a la opción elegida y con marca de tiempo.
 - **Resultado**: resumen calculado de una votación una vez cerrada (totales por opción, porcentaje de participación, si se alcanzó quórum).
-- **Historial / Auditoría**: bitácora de eventos relevantes (apertura, cierre, cambios administrativos) para trazabilidad.
+- **Historial / Auditoría**: bitácora de eventos relevantes (apertura, cierre, cambios administrativos) para trazabilidad. Implementada en MongoDB Atlas, no en SQL Server (ver [sección dedicada](#segunda-base-de-datos-mongodb-atlas-auditoría) más abajo).
 
 ## Reglas de negocio
 
@@ -81,11 +81,61 @@ El proyecto busca construir una plataforma que permita:
 2. Crear `backend/.env` a partir de `.env.example` y definir `JWT_SECRET` (obligatorio, mínimo 32 caracteres): `python -c "import secrets; print(secrets.token_hex(32))"`. Sin él la API no arranca.
 3. Base de datos:
    - **BD nueva:** ejecutar `db/schema.sql` y luego `db/seed.sql`. Los 5 miembros del seed entran con su nombre (p. ej. `Marta Gómez`) y su documento (p. ej. `52104887`) como clave temporal; la API los obliga a definir una clave propia en ese primer login.
-   - **BD ya existente:** ejecutar `db/migracion_login.sql`. Los miembros con `PasswordHash NULL` ya pueden usar el flujo de arriba sin pasos adicionales; `python -m scripts.set_password <identificacion>` sigue disponible para que un administrador asigne una clave a mano si hace falta.
+   - **BD ya existente:** ejecutar `db/migracion_login.sql` y `db/migracion_roles.sql` (ambos idempotentes). Los miembros con `PasswordHash NULL` ya pueden usar el flujo de arriba sin pasos adicionales; `python -m scripts.set_password <identificacion>` sigue disponible para que un administrador asigne una clave a mano si hace falta. Todos los miembros existentes quedan con `Rol = 'Miembro'`; para promover a alguien a `Administrador` o `Auditor`, ver el comentario al final de `db/migracion_roles.sql`.
 
 **Pruebas:** `pip install -r requirements-dev.txt` y `python -m pytest` (usan SQLite en memoria; no requieren SQL Server).
 
-**Fuera de alcance por ahora:** roles (administrador, auditor), límite de intentos de login, recuperación de contraseña olvidada desde la interfaz. La `Identificacion` es única en toda la plataforma (un mismo miembro no puede estar en dos organizaciones).
+**Fuera de alcance por ahora:** límite de intentos de login, recuperación de contraseña olvidada desde la interfaz. La `Identificacion` es única en toda la plataforma (un mismo miembro no puede estar en dos organizaciones).
+
+## Roles
+
+Cada miembro tiene un `Rol` (`Miembros.Rol`): `Miembro`, `Administrador` o `Auditor`.
+
+- **Miembro**: vota y consulta las votaciones y resultados de su organización. Es el rol por defecto.
+- **Administrador**: además de lo anterior, convoca votaciones (`POST /votaciones`), las cierra manualmente antes de su vencimiento (`POST /votaciones/{id}/cerrar`) y da de alta nuevos miembros (`POST /organizaciones/{id}/miembros`). Solo administra su propia organización.
+- **Auditor**: rol de solo lectura con acceso adicional al historial de auditoría (`GET /auditoria`); no vota ni administra.
+
+`GET /auth/me` devuelve el `rol` del miembro autenticado; el frontend usa ese campo para mostrar u ocultar las pestañas "Administración" y "Auditoría".
+
+## Cierre automático de votaciones por ventana de tiempo
+
+Un job en segundo plano (APScheduler, `backend/app/scheduler.py`) corre cada 30 segundos y:
+
+- Pasa una votación de `Pendiente` a `Abierta` cuando `FechaApertura` ya llegó.
+- Pasa una votación de `Pendiente`/`Abierta` a `Cerrada` cuando `FechaCierre` ya pasó.
+
+Esto solo mantiene el campo `Estado` honesto para el frontend y los reportes: `sp_RegistrarVoto` ya rechaza cualquier voto fuera de la ventana de tiempo independientemente del `Estado`, así que la integridad del voto no depende de este job. Se desactiva con `ENABLE_SCHEDULER=false` en `.env` (por ejemplo, si se corren varias instancias de la API contra la misma base de datos, para que no compitan ejecutando el mismo job); también está desactivado en las pruebas (`tests/conftest.py`).
+
+## Segunda base de datos: MongoDB Atlas (auditoría)
+
+El proyecto usa **dos bases de datos** con roles distintos:
+
+- **SQL Server**: toda la lógica transaccional (organizaciones, miembros, votaciones, votos). Es la única fuente de verdad para esas reglas de negocio.
+- **MongoDB Atlas**: historial de auditoría — un log de eventos (`login`, `set_password`, `votar`, `crear_votacion`, `cerrar_votacion`, `crear_miembro`, `apertura_automatica`, `cierre_automatico`) con esquema variable según el tipo de evento. Encaja con un modelo de documentos porque es append-only y no participa en ninguna transacción ni regla de negocio (no se usa para calcular quórum, resultados, ni para impedir doble voto).
+
+El logging de auditoría es **best-effort** (`backend/app/mongo.py`): si `MONGODB_URI` no está configurado, o Mongo no responde, la API funciona con total normalidad y el evento simplemente no queda registrado (se registra un warning en los logs, nunca se devuelve un error al cliente).
+
+**Puesta en marcha:**
+
+1. Crear un cluster en [MongoDB Atlas](https://www.mongodb.com/atlas) (el free tier M0 alcanza).
+2. En **Database Access**, crear un usuario de base de datos con permisos de lectura/escritura (distinto de tu cuenta de Atlas).
+3. En **Network Access**, permitir la IP desde la que corre la API (o `0.0.0.0/0` solo para desarrollo).
+4. Copiar la cadena de conexión ("Connect" → "Drivers") y pegarla en `backend/.env`:
+   ```
+   MONGODB_URI=mongodb+srv://<usuario>:<password>@<cluster>.mongodb.net/
+   MONGODB_DB=ds_votaciones_auditoria
+   ```
+5. No se requiere crear la colección a mano: `pymongo` la crea sola al insertar el primer evento.
+
+`GET /auditoria` (rol Administrador o Auditor) devuelve el historial de la organización del miembro autenticado, más reciente primero.
+
+## Endpoints de administración
+
+Todos requieren rol `Administrador` y operan sobre la organización del miembro autenticado (no se puede administrar otra organización, aunque se conozca su id):
+
+- `POST /votaciones`: crea una votación en estado `Pendiente`, con sus opciones de voto (mínimo 2). `fecha_cierre` debe ser posterior a `fecha_apertura`.
+- `POST /votaciones/{id}/cerrar`: cierre manual anticipado (409 si ya estaba cerrada). El cierre por vencimiento normal de la ventana de tiempo lo hace el scheduler automático, sin necesidad de llamar a este endpoint.
+- `POST /organizaciones/{id}/miembros`: da de alta un miembro nuevo (409 si la identificación ya existe). El miembro creado entra por primera vez con su documento como contraseña temporal, igual que los del seed inicial.
 
 ## Uso de IA
 

@@ -31,6 +31,10 @@ CREATE TABLE Miembros (
     -- Hash bcrypt de la contraseña (nunca la contraseña en claro).
     -- NULL = el miembro todavia no tiene acceso a la plataforma.
     PasswordHash NVARCHAR(255) NULL,
+    -- Miembro: solo vota y ve su organizacion. Administrador: ademas crea y
+    -- cierra votaciones, y gestiona el padron. Auditor: solo lectura de
+    -- resultados y del historial de auditoria (nunca vota ni administra).
+    Rol NVARCHAR(20) NOT NULL DEFAULT 'Miembro' CHECK (Rol IN ('Miembro', 'Administrador', 'Auditor')),
     -- La identificacion es el usuario de login, por eso debe ser unica.
     CONSTRAINT UQ_Miembros_Identificacion UNIQUE (Identificacion)
 );

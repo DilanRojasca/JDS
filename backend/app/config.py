@@ -21,6 +21,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
 
+    # Segunda base de datos (MongoDB Atlas), usada solo para el historial de
+    # auditoria (login, creacion/cierre de votaciones, cambios de padron).
+    # No participa en ninguna regla de negocio transaccional: esa sigue
+    # viviendo enteramente en SQL Server. Vacio = auditoria deshabilitada
+    # (la API sigue funcionando con normalidad, sin historial).
+    mongodb_uri: str = ""
+    mongodb_db: str = "ds_votaciones_auditoria"
+
+    # Job en segundo plano que transiciona el Estado de las votaciones segun
+    # su ventana de tiempo (ver app/scheduler.py). Se desactiva en pruebas.
+    enable_scheduler: bool = True
+
     @property
     def sqlalchemy_url(self) -> str:
         odbc = (

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import Connection, text
 
 from app.db import get_connection
+from app.mongo import log_evento
 from app.schemas import (
     CambiarPasswordCrear,
     LoginCrear,
@@ -27,7 +28,7 @@ def login(datos: LoginCrear, conn: Connection = Depends(get_connection)) -> Logi
     candidatos = conn.execute(
         text(
             """
-            SELECT m.MiembroId, m.Nombre, m.PesoVoto, m.OrganizacionId, m.PasswordHash,
+            SELECT m.MiembroId, m.Nombre, m.PesoVoto, m.OrganizacionId, m.PasswordHash, m.Rol,
                    m.Identificacion, o.Nombre AS OrganizacionNombre
             FROM Miembros m
             JOIN Organizaciones o ON o.OrganizacionId = m.OrganizacionId
@@ -59,12 +60,20 @@ def login(datos: LoginCrear, conn: Connection = Depends(get_connection)) -> Logi
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    log_evento(
+        organizacion_id=autenticado["OrganizacionId"],
+        miembro_id=autenticado["MiembroId"],
+        accion="login",
+        detalle={"nombre": autenticado["Nombre"]},
+    )
+
     return LoginRespuesta(
         access_token=create_access_token(autenticado["MiembroId"]),
         miembro=MiembroSesion(
             miembro_id=autenticado["MiembroId"],
             nombre=autenticado["Nombre"],
             peso_voto=autenticado["PesoVoto"],
+            rol=autenticado["Rol"],
             organizacion_id=autenticado["OrganizacionId"],
             organizacion_nombre=autenticado["OrganizacionNombre"],
             debe_cambiar_password=autenticado["PasswordHash"] is None,
@@ -94,4 +103,10 @@ def set_password(
             text("UPDATE Miembros SET PasswordHash = :hash WHERE MiembroId = :miembro_id"),
             {"hash": hash_password(datos.nueva_password), "miembro_id": miembro.miembro_id},
         )
+    log_evento(
+        organizacion_id=miembro.organizacion_id,
+        miembro_id=miembro.miembro_id,
+        accion="set_password",
+        detalle={},
+    )
     return MensajeRespuesta(mensaje="Contraseña actualizada correctamente")

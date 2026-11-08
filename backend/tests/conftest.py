@@ -13,6 +13,11 @@ import sys
 import types
 
 os.environ["JWT_SECRET"] = "clave-solo-para-pruebas-" + "x" * 16
+# El scheduler apunta al engine real (mssql vía pyodbc); en pruebas no hay
+# tal servidor, así que se desactiva por completo.
+os.environ["ENABLE_SCHEDULER"] = "false"
+# Sin MONGODB_URI, log_evento()/listar_eventos() son no-op (ver app/mongo.py):
+# las pruebas no necesitan un cluster de Mongo real.
 
 # pyodbc necesita el driver ODBC del sistema; para importar app.db (que crea
 # el engine, sin conectar) basta un modulo falso.
@@ -41,7 +46,7 @@ CREATE TABLE Organizaciones (OrganizacionId INTEGER PRIMARY KEY AUTOINCREMENT, N
 CREATE TABLE Miembros (
     MiembroId INTEGER PRIMARY KEY AUTOINCREMENT, OrganizacionId INT NOT NULL,
     Identificacion TEXT NOT NULL UNIQUE, Nombre TEXT NOT NULL, PesoVoto REAL NOT NULL,
-    PasswordHash TEXT NULL);
+    PasswordHash TEXT NULL, Rol TEXT NOT NULL DEFAULT 'Miembro');
 CREATE TABLE Votaciones (
     VotacionId INTEGER PRIMARY KEY AUTOINCREMENT, OrganizacionId INT NOT NULL, Titulo TEXT NOT NULL,
     Descripcion TEXT, QuorumRequerido REAL NOT NULL, FechaApertura TEXT NOT NULL,
@@ -80,6 +85,14 @@ def engine():
                 "INSERT INTO Votos (VotacionId, MiembroId, OpcionId) VALUES (?, ?, ?) "
                 "RETURNING 'Voto registrado exitosamente' AS Mensaje"
             )
+        # T-SQL "INSERT INTO t (...) OUTPUT INSERTED.Col VALUES (...)" no
+        # existe en SQLite; se traduce a la forma equivalente con RETURNING,
+        # que en SQLite va al final del statement en vez de antes de VALUES.
+        # Igual para "UPDATE t SET ... OUTPUT INSERTED.Col WHERE ...".
+        m = re.search(r"OUTPUT INSERTED\.(\w+)(?:, INSERTED\.(\w+))?\s*", statement)
+        if m:
+            columnas = ", ".join(c for c in m.groups() if c)
+            statement = statement.replace(m.group(0), "") + f" RETURNING {columnas}"
         return statement, parameters
 
     h = hash_password(PASSWORD)
@@ -91,12 +104,13 @@ def engine():
         c.execute(text("INSERT INTO Organizaciones (Nombre) VALUES ('Org A'), ('Org B')"))
         c.execute(
             text(
-                "INSERT INTO Miembros (OrganizacionId, Identificacion, Nombre, PesoVoto, PasswordHash) VALUES "
-                "(1, '1001', 'Ana',   2.0, :h),"
-                "(1, '1002', 'Beto',  3.0, :h),"
-                "(2, '2001', 'Carla', 5.0, :h),"
-                "(1, '1003', 'SinClave', 1.0, NULL),"
-                "(2, '2002', 'Ana',   4.0, :h_ana_b)"  # homonima de (1) en otra org, con otra clave
+                "INSERT INTO Miembros (OrganizacionId, Identificacion, Nombre, PesoVoto, PasswordHash, Rol) VALUES "
+                "(1, '1001', 'Ana',   2.0, :h, 'Administrador'),"
+                "(1, '1002', 'Beto',  3.0, :h, 'Miembro'),"
+                "(2, '2001', 'Carla', 5.0, :h, 'Administrador'),"
+                "(1, '1003', 'SinClave', 1.0, NULL, 'Miembro'),"
+                "(1, '1004', 'Vero',  1.0, :h, 'Auditor'),"
+                "(2, '2002', 'Ana',   4.0, :h_ana_b, 'Miembro')"  # homonima de (1) en otra org, con otra clave
             ),
             {"h": h, "h_ana_b": h_ana_b},
         )

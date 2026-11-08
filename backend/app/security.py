@@ -9,7 +9,7 @@ from sqlalchemy import Connection, text
 
 from app.config import settings
 from app.db import get_connection
-from app.schemas import MiembroSesion
+from app.schemas import MiembroSesion, Rol
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -101,7 +101,7 @@ def get_current_member(
         row = conn.execute(
             text(
                 """
-                SELECT m.MiembroId, m.Nombre, m.PesoVoto, m.OrganizacionId, m.PasswordHash,
+                SELECT m.MiembroId, m.Nombre, m.PesoVoto, m.OrganizacionId, m.PasswordHash, m.Rol,
                        o.Nombre AS OrganizacionNombre
                 FROM Miembros m
                 JOIN Organizaciones o ON o.OrganizacionId = m.OrganizacionId
@@ -118,6 +118,7 @@ def get_current_member(
         miembro_id=row["MiembroId"],
         nombre=row["Nombre"],
         peso_voto=row["PesoVoto"],
+        rol=row["Rol"],
         organizacion_id=row["OrganizacionId"],
         organizacion_nombre=row["OrganizacionNombre"],
         debe_cambiar_password=row["PasswordHash"] is None,
@@ -136,5 +137,29 @@ def get_current_member_activo(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Debes definir una contraseña propia antes de continuar (POST /auth/set-password).",
+        )
+    return miembro
+
+
+def require_admin(
+    miembro: MiembroSesion = Depends(get_current_member_activo),
+) -> MiembroSesion:
+    """Solo Administrador: crear/cerrar votaciones, gestionar el padron."""
+    if miembro.rol != Rol.ADMINISTRADOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta acción requiere rol de Administrador.",
+        )
+    return miembro
+
+
+def require_admin_o_auditor(
+    miembro: MiembroSesion = Depends(get_current_member_activo),
+) -> MiembroSesion:
+    """Administrador o Auditor: lectura del historial de auditoría."""
+    if miembro.rol not in (Rol.ADMINISTRADOR, Rol.AUDITOR):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta acción requiere rol de Administrador o Auditor.",
         )
     return miembro

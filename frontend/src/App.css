@@ -80,6 +80,74 @@ body {
   padding: 32px 24px 64px;
 }
 
+.app-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 32px;
+  background: #16231d;
+  border-top: 1px solid #223a2f;
+}
+
+.tab-button {
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  color: #b7c4bb;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-button:hover {
+  color: #fff;
+}
+
+.tab-button.activo {
+  color: #fff;
+  border-bottom-color: var(--primary);
+}
+
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.opcion-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.opcion-input-row input {
+  flex-grow: 1;
+}
+
+.votacion-cerrar-link {
+  color: var(--danger);
+  margin-left: 16px;
+}
+
+.auditoria-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.auditoria-tabla th,
+.auditoria-tabla td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.auditoria-tabla th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .votaciones-list {
   display: flex;
   flex-direction: column;

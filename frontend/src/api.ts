@@ -48,10 +48,13 @@ export interface Organizacion {
   nombre: string;
 }
 
+export type Rol = "Miembro" | "Administrador" | "Auditor";
+
 export interface Miembro {
   miembro_id: number;
   nombre: string;
   peso_voto: number;
+  rol: Rol;
 }
 
 export interface MiembroSesion extends Miembro {
@@ -175,3 +178,47 @@ export const registrarVoto = (votacionId: number, opcionId: number) =>
     method: "POST",
     body: JSON.stringify({ opcion_id: opcionId }),
   });
+
+// ---- Administración (solo rol Administrador) ----
+
+export interface VotacionCrear {
+  titulo: string;
+  descripcion?: string;
+  quorum_requerido: number;
+  fecha_apertura: string;
+  fecha_cierre: string;
+  opciones: string[];
+}
+
+export const crearVotacion = (datos: VotacionCrear) =>
+  apiFetch<VotacionDetalle>("/votaciones", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+
+export const cerrarVotacion = (votacionId: number) =>
+  apiFetch<VotacionResumen>(`/votaciones/${votacionId}/cerrar`, { method: "POST" });
+
+export interface MiembroCrear {
+  identificacion: string;
+  nombre: string;
+  peso_voto: number;
+  rol?: Rol;
+}
+
+export const crearMiembro = (organizacionId: number, datos: MiembroCrear) =>
+  apiFetch<Miembro>(`/organizaciones/${organizacionId}/miembros`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+
+// ---- Auditoría (Administrador o Auditor) ----
+
+export interface EventoAuditoria {
+  accion: string;
+  miembro_id: number | null;
+  detalle: Record<string, unknown>;
+  fecha: string;
+}
+
+export const listarAuditoria = () => apiFetch<EventoAuditoria[]>("/auditoria");

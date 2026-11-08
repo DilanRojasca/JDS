@@ -1,6 +1,13 @@
 from datetime import datetime
+from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+class Rol(str, Enum):
+    MIEMBRO = "Miembro"
+    ADMINISTRADOR = "Administrador"
+    AUDITOR = "Auditor"
 
 
 class Organizacion(BaseModel):
@@ -12,6 +19,7 @@ class Miembro(BaseModel):
     miembro_id: int
     nombre: str
     peso_voto: float
+    rol: Rol = Rol.MIEMBRO
 
 
 class MiembroSesion(Miembro):
@@ -21,6 +29,13 @@ class MiembroSesion(Miembro):
     # su documento como clave temporal y el resto de la API le queda
     # bloqueada hasta llamar a POST /auth/set-password.
     debe_cambiar_password: bool = False
+
+
+class MiembroCrear(BaseModel):
+    identificacion: str = Field(min_length=1, max_length=50)
+    nombre: str = Field(min_length=1, max_length=100)
+    peso_voto: float = Field(gt=0)
+    rol: Rol = Rol.MIEMBRO
 
 
 class LoginCrear(BaseModel):
@@ -63,6 +78,29 @@ class VotacionResumen(BaseModel):
 class VotacionDetalle(VotacionResumen):
     descripcion: str | None
     opciones: list[OpcionVoto]
+
+
+class VotacionCrear(BaseModel):
+    titulo: str = Field(min_length=1, max_length=200)
+    descripcion: str | None = None
+    quorum_requerido: float = Field(gt=0)
+    fecha_apertura: datetime
+    fecha_cierre: datetime
+    # Minimo 2: una votacion de una sola opcion no tiene sentido.
+    opciones: list[str] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def _validar_ventana(self) -> "VotacionCrear":
+        if self.fecha_cierre <= self.fecha_apertura:
+            raise ValueError("fecha_cierre debe ser posterior a fecha_apertura")
+        return self
+
+
+class EventoAuditoria(BaseModel):
+    accion: str
+    miembro_id: int | None
+    detalle: dict
+    fecha: datetime
 
 
 class OpcionResultado(BaseModel):

@@ -4,6 +4,8 @@ interface Props {
   votaciones: VotacionResumen[];
   onSeleccionar: (id: number, estado: string) => void;
   onVerResultados: (id: number) => void;
+  esAdmin?: boolean;
+  onCerrar?: (id: number) => void;
 }
 
 function formatFecha(iso: string): string {
@@ -16,7 +18,7 @@ function formatFecha(iso: string): string {
   });
 }
 
-export function VotacionesList({ votaciones, onSeleccionar, onVerResultados }: Props) {
+export function VotacionesList({ votaciones, onSeleccionar, onVerResultados, esAdmin, onCerrar }: Props) {
   if (votaciones.length === 0) {
     return <p className="empty-state">No hay votaciones registradas todavía.</p>;
   }
@@ -39,6 +41,11 @@ export function VotacionesList({ votaciones, onSeleccionar, onVerResultados }: P
           >
             Ver resultados →
           </button>
+          {esAdmin && v.estado !== "Cerrada" && v.estado !== "Anulada" && onCerrar && (
+            <button className="link-button votacion-cerrar-link" onClick={() => onCerrar(v.votacion_id)}>
+              Cerrar votación
+            </button>
+          )}
         </div>
       ))}
     </div>

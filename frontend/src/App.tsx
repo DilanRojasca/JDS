@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import {
   ApiError,
+  cerrarVotacion,
   clearToken,
   getToken,
   listarVotaciones,
@@ -10,6 +11,8 @@ import {
   type MiembroSesion,
   type VotacionResumen,
 } from "./api";
+import { AdminPanelView } from "./components/AdminPanelView";
+import { AuditoriaView } from "./components/AuditoriaView";
 import { CambiarPasswordView } from "./components/CambiarPasswordView";
 import { LoginView } from "./components/LoginView";
 import { VotacionesList } from "./components/VotacionesList";
@@ -19,7 +22,9 @@ import { ResultadosView } from "./components/ResultadosView";
 type Vista =
   | { tipo: "lista" }
   | { tipo: "votar"; votacionId: number }
-  | { tipo: "resultados"; votacionId: number };
+  | { tipo: "resultados"; votacionId: number }
+  | { tipo: "admin" }
+  | { tipo: "auditoria" };
 
 const MENSAJE_CONEXION =
   'No se pudo conectar con la API. ¿Está corriendo "python -m uvicorn app.main:app --reload" en backend/?';
@@ -93,6 +98,15 @@ function App() {
       .catch(() => {});
   }
 
+  async function cerrarVotacionYRecargar(votacionId: number) {
+    try {
+      await cerrarVotacion(votacionId);
+      recargarVotaciones();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : MENSAJE_CONEXION);
+    }
+  }
+
   if (verificando) {
     return <p className="app-loading">Cargando...</p>;
   }
@@ -126,6 +140,31 @@ function App() {
         </div>
       </header>
 
+      <nav className="app-tabs">
+        <button
+          className={`tab-button ${vista.tipo === "lista" || vista.tipo === "votar" || vista.tipo === "resultados" ? "activo" : ""}`}
+          onClick={() => setVista({ tipo: "lista" })}
+        >
+          Votaciones
+        </button>
+        {sesion.rol === "Administrador" && (
+          <button
+            className={`tab-button ${vista.tipo === "admin" ? "activo" : ""}`}
+            onClick={() => setVista({ tipo: "admin" })}
+          >
+            Administración
+          </button>
+        )}
+        {(sesion.rol === "Administrador" || sesion.rol === "Auditor") && (
+          <button
+            className={`tab-button ${vista.tipo === "auditoria" ? "activo" : ""}`}
+            onClick={() => setVista({ tipo: "auditoria" })}
+          >
+            Auditoría
+          </button>
+        )}
+      </nav>
+
       <main className="app-main">
         {cargando && <p>Cargando...</p>}
         {error && <p className="error-text">{error}</p>}
@@ -143,6 +182,8 @@ function App() {
                 )
               }
               onVerResultados={(id) => setVista({ tipo: "resultados", votacionId: id })}
+              esAdmin={sesion.rol === "Administrador"}
+              onCerrar={cerrarVotacionYRecargar}
             />
           </>
         )}
@@ -163,6 +204,20 @@ function App() {
             votacionId={vista.votacionId}
             onVolver={() => setVista({ tipo: "lista" })}
           />
+        )}
+
+        {vista.tipo === "admin" && sesion.rol === "Administrador" && (
+          <>
+            <h1>Administración</h1>
+            <AdminPanelView miembro={sesion} onVotacionCreada={recargarVotaciones} />
+          </>
+        )}
+
+        {vista.tipo === "auditoria" && (sesion.rol === "Administrador" || sesion.rol === "Auditor") && (
+          <>
+            <h1>Auditoría</h1>
+            <AuditoriaView />
+          </>
         )}
       </main>
     </div>
