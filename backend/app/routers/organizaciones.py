@@ -4,18 +4,48 @@ from sqlalchemy.exc import IntegrityError
 
 from app.db import get_connection
 from app.mongo import log_evento
-from app.schemas import Miembro, MiembroCrear, MiembroSesion, Organizacion
-from app.security import get_current_member_activo, require_admin
+from app.schemas import Miembro, MiembroCrear, MiembroSesion, Organizacion, OrganizacionCrear, Rol
+from app.security import get_current_member_activo, require_admin, require_superadmin
 
 router = APIRouter(prefix="/organizaciones", tags=["organizaciones"])
 
 
 @router.get("", response_model=list[Organizacion])
 def listar_organizaciones(
+    conn: Connection = Depends(get_connection),
     actual: MiembroSesion = Depends(get_current_member_activo),
 ) -> list[Organizacion]:
-    # Un miembro solo ve su propia organizacion (aislamiento multi-tenant).
+    # Un miembro solo ve su propia organizacion (aislamiento multi-tenant);
+    # el Superadministrador es la unica excepcion: ve todas.
+    if actual.rol == Rol.SUPERADMINISTRADOR:
+        rows = conn.execute(
+            text("SELECT OrganizacionId, Nombre FROM Organizaciones ORDER BY Nombre")
+        ).mappings()
+        return [Organizacion(organizacion_id=r["OrganizacionId"], nombre=r["Nombre"]) for r in rows]
+
     return [Organizacion(organizacion_id=actual.organizacion_id, nombre=actual.organizacion_nombre)]
+
+
+@router.post("", response_model=Organizacion, status_code=201)
+def crear_organizacion(
+    datos: OrganizacionCrear,
+    conn: Connection = Depends(get_connection),
+    actual: MiembroSesion = Depends(require_superadmin),
+) -> Organizacion:
+    with conn.begin():
+        result = conn.execute(
+            text("INSERT INTO Organizaciones (Nombre) OUTPUT INSERTED.OrganizacionId VALUES (:nombre)"),
+            {"nombre": datos.nombre},
+        )
+        organizacion_id = result.scalar_one()
+
+    log_evento(
+        organizacion_id=organizacion_id,
+        miembro_id=actual.miembro_id,
+        accion="crear_organizacion",
+        detalle={"nombre": datos.nombre},
+    )
+    return Organizacion(organizacion_id=organizacion_id, nombre=datos.nombre)
 
 
 @router.get("/{organizacion_id}/miembros", response_model=list[Miembro])
@@ -24,7 +54,8 @@ def listar_miembros(
     conn: Connection = Depends(get_connection),
     actual: MiembroSesion = Depends(get_current_member_activo),
 ) -> list[Miembro]:
-    if organizacion_id != actual.organizacion_id:
+    # El Superadministrador puede ver el padron de cualquier organizacion.
+    if organizacion_id != actual.organizacion_id and actual.rol != Rol.SUPERADMINISTRADOR:
         raise HTTPException(status_code=403, detail="No perteneces a esta organización")
 
     rows = conn.execute(

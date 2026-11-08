@@ -110,6 +110,7 @@ def engine():
                 "(2, '2001', 'Carla', 5.0, :h, 'Administrador'),"
                 "(1, '1003', 'SinClave', 1.0, NULL, 'Miembro'),"
                 "(1, '1004', 'Vero',  1.0, :h, 'Auditor'),"
+                "(1, '1005', 'Super', 1.0, :h, 'Superadministrador'),"
                 "(2, '2002', 'Ana',   4.0, :h_ana_b, 'Miembro')"  # homonima de (1) en otra org, con otra clave
             ),
             {"h": h, "h_ana_b": h_ana_b},
@@ -139,6 +140,18 @@ def client(engine):
     app.dependency_overrides[get_connection] = _get_connection
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _limpiar_rate_limit():
+    # app.rate_limit guarda los intentos fallidos en un dict de modulo (no
+    # por conexion/engine de prueba): sin esto, los intentos fallidos de un
+    # test se acumulan en el siguiente y lo bloquean con 429 sin motivo.
+    from app.rate_limit import _intentos
+
+    _intentos.clear()
+    yield
+    _intentos.clear()
 
 
 def login(client, nombre="Ana", password=PASSWORD):

@@ -156,10 +156,23 @@ def require_admin(
 def require_admin_o_auditor(
     miembro: MiembroSesion = Depends(get_current_member_activo),
 ) -> MiembroSesion:
-    """Administrador o Auditor: lectura del historial de auditoría."""
-    if miembro.rol not in (Rol.ADMINISTRADOR, Rol.AUDITOR):
+    """Administrador, Auditor o Superadministrador: lectura del historial de auditoría."""
+    if miembro.rol not in (Rol.ADMINISTRADOR, Rol.AUDITOR, Rol.SUPERADMINISTRADOR):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Esta acción requiere rol de Administrador o Auditor.",
+            detail="Esta acción requiere rol de Administrador, Auditor o Superadministrador.",
+        )
+    return miembro
+
+
+def require_superadmin(
+    miembro: MiembroSesion = Depends(get_current_member_activo),
+) -> MiembroSesion:
+    """Solo Superadministrador: el único rol no limitado a una organización
+    (crear organizaciones, ver padrón/auditoría de cualquiera)."""
+    if miembro.rol != Rol.SUPERADMINISTRADOR:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta acción requiere rol de Superadministrador.",
         )
     return miembro

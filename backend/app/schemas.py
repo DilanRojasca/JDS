@@ -8,11 +8,16 @@ class Rol(str, Enum):
     MIEMBRO = "Miembro"
     ADMINISTRADOR = "Administrador"
     AUDITOR = "Auditor"
+    SUPERADMINISTRADOR = "Superadministrador"
 
 
 class Organizacion(BaseModel):
     organizacion_id: int
     nombre: str
+
+
+class OrganizacionCrear(BaseModel):
+    nombre: str = Field(min_length=1, max_length=100)
 
 
 class Miembro(BaseModel):
@@ -59,6 +64,13 @@ class CambiarPasswordCrear(BaseModel):
 
 class MensajeRespuesta(BaseModel):
     mensaje: str
+
+
+class OlvidePasswordCrear(BaseModel):
+    # Mismos datos que el primer login (nombre + documento), no la clave
+    # actual: es justamente para el caso en que esa clave ya se olvido.
+    nombre: str = Field(min_length=1, max_length=100)
+    identificacion: str = Field(min_length=1, max_length=50)
 
 
 class OpcionVoto(BaseModel):

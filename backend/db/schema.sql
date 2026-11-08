@@ -32,9 +32,13 @@ CREATE TABLE Miembros (
     -- NULL = el miembro todavia no tiene acceso a la plataforma.
     PasswordHash NVARCHAR(255) NULL,
     -- Miembro: solo vota y ve su organizacion. Administrador: ademas crea y
-    -- cierra votaciones, y gestiona el padron. Auditor: solo lectura de
-    -- resultados y del historial de auditoria (nunca vota ni administra).
-    Rol NVARCHAR(20) NOT NULL DEFAULT 'Miembro' CHECK (Rol IN ('Miembro', 'Administrador', 'Auditor')),
+    -- cierra votaciones, y gestiona el padron, siempre dentro de su propia
+    -- organizacion. Auditor: solo lectura de resultados y del historial de
+    -- auditoria (nunca vota ni administra). Superadministrador: el unico
+    -- rol que no esta limitado a una sola organizacion -- ve el padron y la
+    -- auditoria de cualquiera, y da de alta organizaciones nuevas.
+    Rol NVARCHAR(25) NOT NULL DEFAULT 'Miembro'
+        CHECK (Rol IN ('Miembro', 'Administrador', 'Auditor', 'Superadministrador')),
     -- La identificacion es el usuario de login, por eso debe ser unica.
     CONSTRAINT UQ_Miembros_Identificacion UNIQUE (Identificacion)
 );

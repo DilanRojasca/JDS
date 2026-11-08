@@ -74,6 +74,8 @@ El proyecto busca construir una plataforma que permita:
 - **Quién vota lo decide el token, no el cliente**: `POST /votaciones/{id}/votos` recibe solo `opcion_id`; el `miembro_id` sale de la sesión. Ningún miembro puede votar a nombre de otro.
 - **Aislamiento por organización**: un miembro solo ve y vota en votaciones de su organización (una votación ajena responde 404).
 - Login fallido responde siempre lo mismo (“Nombre o contraseña incorrectos”), exista o no ese nombre.
+- **Límite de intentos**: tras 5 intentos fallidos consecutivos con el mismo nombre, el login responde `429` durante 15 minutos (incluso si después se manda la contraseña correcta). Un login exitoso reinicia el contador. Es un límite en memoria del proceso (`backend/app/rate_limit.py`), no una tabla ni un servicio externo.
+- **Contraseña olvidada**: `POST /auth/olvide-password` con `nombre` + `identificacion` (el mismo documento del primer ingreso) borra la contraseña del miembro y lo regresa al flujo de "primer ingreso": puede volver a entrar con su documento como clave temporal y la API le exige definir una nueva. Responde siempre el mismo mensaje, coincidan o no los datos, para no filtrar qué identificaciones existen.
 
 **Puesta en marcha:**
 
@@ -85,17 +87,18 @@ El proyecto busca construir una plataforma que permita:
 
 **Pruebas:** `pip install -r requirements-dev.txt` y `python -m pytest` (usan SQLite en memoria; no requieren SQL Server).
 
-**Fuera de alcance por ahora:** límite de intentos de login, recuperación de contraseña olvidada desde la interfaz. La `Identificacion` es única en toda la plataforma (un mismo miembro no puede estar en dos organizaciones).
+La `Identificacion` es única en toda la plataforma (un mismo miembro no puede estar en dos organizaciones).
 
 ## Roles
 
-Cada miembro tiene un `Rol` (`Miembros.Rol`): `Miembro`, `Administrador` o `Auditor`.
+Cada miembro tiene un `Rol` (`Miembros.Rol`): `Miembro`, `Administrador`, `Auditor` o `Superadministrador`.
 
 - **Miembro**: vota y consulta las votaciones y resultados de su organización. Es el rol por defecto.
 - **Administrador**: además de lo anterior, convoca votaciones (`POST /votaciones`), las cierra manualmente antes de su vencimiento (`POST /votaciones/{id}/cerrar`) y da de alta nuevos miembros (`POST /organizaciones/{id}/miembros`). Solo administra su propia organización.
 - **Auditor**: rol de solo lectura con acceso adicional al historial de auditoría (`GET /auditoria`); no vota ni administra.
+- **Superadministrador**: el único rol que no está limitado a una sola organización. Da de alta organizaciones nuevas (`POST /organizaciones`), ve el listado completo de organizaciones (`GET /organizaciones` le devuelve todas en vez de solo la propia), y puede consultar el padrón (`GET /organizaciones/{id}/miembros`) y la auditoría (`GET /auditoria?organizacion_id=...`) de cualquiera de ellas. No crea ni cierra votaciones de organizaciones ajenas: esa sigue siendo tarea del `Administrador` de cada una.
 
-`GET /auth/me` devuelve el `rol` del miembro autenticado; el frontend usa ese campo para mostrar u ocultar las pestañas "Administración" y "Auditoría".
+`GET /auth/me` devuelve el `rol` del miembro autenticado; el frontend usa ese campo para mostrar u ocultar las pestañas "Administración", "Auditoría" y "Organizaciones" (esta última solo para `Superadministrador`).
 
 ## Cierre automático de votaciones por ventana de tiempo
 
@@ -136,6 +139,10 @@ Todos requieren rol `Administrador` y operan sobre la organización del miembro 
 - `POST /votaciones`: crea una votación en estado `Pendiente`, con sus opciones de voto (mínimo 2). `fecha_cierre` debe ser posterior a `fecha_apertura`.
 - `POST /votaciones/{id}/cerrar`: cierre manual anticipado (409 si ya estaba cerrada). El cierre por vencimiento normal de la ventana de tiempo lo hace el scheduler automático, sin necesidad de llamar a este endpoint.
 - `POST /organizaciones/{id}/miembros`: da de alta un miembro nuevo (409 si la identificación ya existe). El miembro creado entra por primera vez con su documento como contraseña temporal, igual que los del seed inicial.
+
+El único endpoint de administración que no requiere `Administrador` sino `Superadministrador` es:
+
+- `POST /organizaciones`: crea una organización nueva (solo `{ "nombre": "..." }`; todavía sin miembros ni votaciones).
 
 ## Uso de IA
 

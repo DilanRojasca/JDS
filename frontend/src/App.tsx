@@ -15,6 +15,7 @@ import { AdminPanelView } from "./components/AdminPanelView";
 import { AuditoriaView } from "./components/AuditoriaView";
 import { CambiarPasswordView } from "./components/CambiarPasswordView";
 import { LoginView } from "./components/LoginView";
+import { SuperadminView } from "./components/SuperadminView";
 import { VotacionesList } from "./components/VotacionesList";
 import { VotarView } from "./components/VotarView";
 import { ResultadosView } from "./components/ResultadosView";
@@ -24,7 +25,8 @@ type Vista =
   | { tipo: "votar"; votacionId: number }
   | { tipo: "resultados"; votacionId: number }
   | { tipo: "admin" }
-  | { tipo: "auditoria" };
+  | { tipo: "auditoria" }
+  | { tipo: "superadmin" };
 
 const MENSAJE_CONEXION =
   'No se pudo conectar con la API. ¿Está corriendo "python -m uvicorn app.main:app --reload" en backend/?';
@@ -155,12 +157,20 @@ function App() {
             Administración
           </button>
         )}
-        {(sesion.rol === "Administrador" || sesion.rol === "Auditor") && (
+        {(sesion.rol === "Administrador" || sesion.rol === "Auditor" || sesion.rol === "Superadministrador") && (
           <button
             className={`tab-button ${vista.tipo === "auditoria" ? "activo" : ""}`}
             onClick={() => setVista({ tipo: "auditoria" })}
           >
             Auditoría
+          </button>
+        )}
+        {sesion.rol === "Superadministrador" && (
+          <button
+            className={`tab-button ${vista.tipo === "superadmin" ? "activo" : ""}`}
+            onClick={() => setVista({ tipo: "superadmin" })}
+          >
+            Organizaciones
           </button>
         )}
       </nav>
@@ -213,10 +223,18 @@ function App() {
           </>
         )}
 
-        {vista.tipo === "auditoria" && (sesion.rol === "Administrador" || sesion.rol === "Auditor") && (
+        {vista.tipo === "auditoria" &&
+          (sesion.rol === "Administrador" || sesion.rol === "Auditor" || sesion.rol === "Superadministrador") && (
+            <>
+              <h1>Auditoría</h1>
+              <AuditoriaView />
+            </>
+          )}
+
+        {vista.tipo === "superadmin" && sesion.rol === "Superadministrador" && (
           <>
-            <h1>Auditoría</h1>
-            <AuditoriaView />
+            <h1>Organizaciones</h1>
+            <SuperadminView />
           </>
         )}
       </main>
