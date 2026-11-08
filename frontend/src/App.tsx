@@ -15,10 +15,12 @@ import { AdminPanelView } from "./components/AdminPanelView";
 import { AuditoriaView } from "./components/AuditoriaView";
 import { CambiarPasswordView } from "./components/CambiarPasswordView";
 import { LoginView } from "./components/LoginView";
+import { Sidebar, type SidebarItem } from "./components/Sidebar";
 import { SuperadminView } from "./components/SuperadminView";
 import { VotacionesList } from "./components/VotacionesList";
 import { VotarView } from "./components/VotarView";
 import { ResultadosView } from "./components/ResultadosView";
+import { IconAdmin, IconAuditoria, IconMenu, IconOrganizaciones, IconVotaciones } from "./icons";
 
 type Vista =
   | { tipo: "lista" }
@@ -27,6 +29,15 @@ type Vista =
   | { tipo: "admin" }
   | { tipo: "auditoria" }
   | { tipo: "superadmin" };
+
+const TITULOS: Record<Vista["tipo"], string> = {
+  lista: "Votaciones",
+  votar: "Votaciones",
+  resultados: "Votaciones",
+  admin: "Administración",
+  auditoria: "Auditoría",
+  superadmin: "Organizaciones",
+};
 
 const MENSAJE_CONEXION =
   'No se pudo conectar con la API. ¿Está corriendo "python -m uvicorn app.main:app --reload" en backend/?';
@@ -40,6 +51,7 @@ function App() {
   const [vista, setVista] = useState<Vista>({ tipo: "lista" });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   const entrar = useCallback(async (miembro: MiembroSesion) => {
     setSesion(miembro);
@@ -109,6 +121,11 @@ function App() {
     }
   }
 
+  function navegar(v: Vista) {
+    setVista(v);
+    setSidebarAbierto(false);
+  }
+
   if (verificando) {
     return <p className="app-loading">Cargando...</p>;
   }
@@ -126,118 +143,134 @@ function App() {
     );
   }
 
+  const enSeccionVotaciones = vista.tipo === "lista" || vista.tipo === "votar" || vista.tipo === "resultados";
+
+  const items: SidebarItem[] = [
+    {
+      key: "lista",
+      label: "Votaciones",
+      icon: IconVotaciones,
+      activo: enSeccionVotaciones,
+      onClick: () => navegar({ tipo: "lista" }),
+    },
+  ];
+
+  if (sesion.rol === "Administrador") {
+    items.push({
+      key: "admin",
+      label: "Administración",
+      icon: IconAdmin,
+      activo: vista.tipo === "admin",
+      onClick: () => navegar({ tipo: "admin" }),
+    });
+  }
+
+  if (sesion.rol === "Administrador" || sesion.rol === "Auditor" || sesion.rol === "Superadministrador") {
+    items.push({
+      key: "auditoria",
+      label: "Auditoría",
+      icon: IconAuditoria,
+      activo: vista.tipo === "auditoria",
+      onClick: () => navegar({ tipo: "auditoria" }),
+    });
+  }
+
+  if (sesion.rol === "Superadministrador") {
+    items.push({
+      key: "superadmin",
+      label: "Organizaciones",
+      icon: IconOrganizaciones,
+      activo: vista.tipo === "superadmin",
+      onClick: () => navegar({ tipo: "superadmin" }),
+    });
+  }
+
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="brand">VotaCoop</div>
-        <div className="org-name">{sesion.organizacion_nombre}</div>
-        <div className="header-user">
-          <span>
-            {sesion.nombre}{" "}
-            <span className="header-user-peso">(peso {sesion.peso_voto.toFixed(2)})</span>
-          </span>
-          <button className="logout-button" onClick={cerrarSesion}>
-            Cerrar sesión
+      <Sidebar
+        sesion={sesion}
+        items={items}
+        abierto={sidebarAbierto}
+        onCerrar={() => setSidebarAbierto(false)}
+        onLogout={cerrarSesion}
+      />
+
+      <div className="app-content">
+        <div className="mobile-topbar">
+          <button
+            className="mobile-menu-button"
+            onClick={() => setSidebarAbierto(true)}
+            aria-label="Abrir menú"
+          >
+            <IconMenu />
           </button>
+          <span className="mobile-topbar-brand">VotaCoop</span>
         </div>
-      </header>
 
-      <nav className="app-tabs">
-        <button
-          className={`tab-button ${vista.tipo === "lista" || vista.tipo === "votar" || vista.tipo === "resultados" ? "activo" : ""}`}
-          onClick={() => setVista({ tipo: "lista" })}
-        >
-          Votaciones
-        </button>
-        {sesion.rol === "Administrador" && (
-          <button
-            className={`tab-button ${vista.tipo === "admin" ? "activo" : ""}`}
-            onClick={() => setVista({ tipo: "admin" })}
-          >
-            Administración
-          </button>
-        )}
-        {(sesion.rol === "Administrador" || sesion.rol === "Auditor" || sesion.rol === "Superadministrador") && (
-          <button
-            className={`tab-button ${vista.tipo === "auditoria" ? "activo" : ""}`}
-            onClick={() => setVista({ tipo: "auditoria" })}
-          >
-            Auditoría
-          </button>
-        )}
-        {sesion.rol === "Superadministrador" && (
-          <button
-            className={`tab-button ${vista.tipo === "superadmin" ? "activo" : ""}`}
-            onClick={() => setVista({ tipo: "superadmin" })}
-          >
-            Organizaciones
-          </button>
-        )}
-      </nav>
+        <main className="app-main">
+          {cargando && <p>Cargando...</p>}
+          {error && <p className="error-text">{error}</p>}
 
-      <main className="app-main">
-        {cargando && <p>Cargando...</p>}
-        {error && <p className="error-text">{error}</p>}
-
-        {!cargando && !error && vista.tipo === "lista" && (
-          <>
-            <h1>Votaciones</h1>
-            <VotacionesList
-              votaciones={votaciones}
-              onSeleccionar={(id, estado) =>
-                setVista(
-                  estado === "Cerrada" || estado === "Anulada"
-                    ? { tipo: "resultados", votacionId: id }
-                    : { tipo: "votar", votacionId: id }
-                )
-              }
-              onVerResultados={(id) => setVista({ tipo: "resultados", votacionId: id })}
-              esAdmin={sesion.rol === "Administrador"}
-              onCerrar={cerrarVotacionYRecargar}
-            />
-          </>
-        )}
-
-        {vista.tipo === "votar" && (
-          <VotarView
-            votacionId={vista.votacionId}
-            miembro={sesion}
-            onVolver={() => {
-              recargarVotaciones();
-              setVista({ tipo: "lista" });
-            }}
-          />
-        )}
-
-        {vista.tipo === "resultados" && (
-          <ResultadosView
-            votacionId={vista.votacionId}
-            onVolver={() => setVista({ tipo: "lista" })}
-          />
-        )}
-
-        {vista.tipo === "admin" && sesion.rol === "Administrador" && (
-          <>
-            <h1>Administración</h1>
-            <AdminPanelView miembro={sesion} onVotacionCreada={recargarVotaciones} />
-          </>
-        )}
-
-        {vista.tipo === "auditoria" &&
-          (sesion.rol === "Administrador" || sesion.rol === "Auditor" || sesion.rol === "Superadministrador") && (
+          {!cargando && !error && vista.tipo === "lista" && (
             <>
-              <h1>Auditoría</h1>
-              <AuditoriaView />
+              <h1>{TITULOS[vista.tipo]}</h1>
+              <VotacionesList
+                votaciones={votaciones}
+                onSeleccionar={(id, estado) =>
+                  setVista(
+                    estado === "Cerrada" || estado === "Anulada"
+                      ? { tipo: "resultados", votacionId: id }
+                      : { tipo: "votar", votacionId: id }
+                  )
+                }
+                onVerResultados={(id) => setVista({ tipo: "resultados", votacionId: id })}
+                esAdmin={sesion.rol === "Administrador"}
+                onCerrar={cerrarVotacionYRecargar}
+              />
             </>
           )}
 
-        {vista.tipo === "superadmin" && sesion.rol === "Superadministrador" && (
-          <>
-            <h1>Organizaciones</h1>
-            <SuperadminView />
-          </>
-        )}
-      </main>
+          {vista.tipo === "votar" && (
+            <VotarView
+              votacionId={vista.votacionId}
+              miembro={sesion}
+              onVolver={() => {
+                recargarVotaciones();
+                setVista({ tipo: "lista" });
+              }}
+            />
+          )}
+
+          {vista.tipo === "resultados" && (
+            <ResultadosView
+              votacionId={vista.votacionId}
+              onVolver={() => setVista({ tipo: "lista" })}
+            />
+          )}
+
+          {vista.tipo === "admin" && sesion.rol === "Administrador" && (
+            <>
+              <h1>{TITULOS[vista.tipo]}</h1>
+              <AdminPanelView miembro={sesion} onVotacionCreada={recargarVotaciones} />
+            </>
+          )}
+
+          {vista.tipo === "auditoria" &&
+            (sesion.rol === "Administrador" || sesion.rol === "Auditor" || sesion.rol === "Superadministrador") && (
+              <>
+                <h1>{TITULOS[vista.tipo]}</h1>
+                <AuditoriaView />
+              </>
+            )}
+
+          {vista.tipo === "superadmin" && sesion.rol === "Superadministrador" && (
+            <>
+              <h1>{TITULOS[vista.tipo]}</h1>
+              <SuperadminView />
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

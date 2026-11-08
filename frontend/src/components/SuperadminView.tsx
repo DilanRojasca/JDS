@@ -131,7 +131,9 @@ export function SuperadminView() {
                   <tr key={m.miembro_id}>
                     <td>{m.nombre}</td>
                     <td>{m.peso_voto.toFixed(2)}</td>
-                    <td>{m.rol}</td>
+                    <td>
+                      <span className={`rol-badge rol-badge-${m.rol.toLowerCase()}`}>{m.rol}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
