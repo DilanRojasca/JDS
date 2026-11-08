@@ -79,7 +79,7 @@ h3 {
 }
 
 .sidebar-brand-mark {
-  width: 32px;
+  width: 38px;
   height: 32px;
   border-radius: 9px;
   background: linear-gradient(135deg, var(--primary), var(--accent));
@@ -87,7 +87,8 @@ h3 {
   place-items: center;
   color: #fff;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
 }
 
