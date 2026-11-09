@@ -73,3 +73,24 @@ export const IconLogout = (props: IconProps) =>
     </>,
     props,
   );
+
+export const IconCheckCircle = (props: IconProps) =>
+  base(
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 12.2l2.3 2.3 4.7-4.9" />
+    </>,
+    props,
+  );
+
+export const IconCircleDashed = (props: IconProps) =>
+  base(
+    <>
+      <path d="M3 12a9 9 0 0 1 2.64-6.36" />
+      <path d="M8 3.6A9 9 0 0 1 16 3.6" />
+      <path d="M20.36 5.64A9 9 0 0 1 21 12" />
+      <path d="M19.4 18.4A9 9 0 0 1 12 21" />
+      <path d="M3.6 16A9 9 0 0 0 8 20.4" />
+    </>,
+    props,
+  );

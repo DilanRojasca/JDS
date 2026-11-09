@@ -27,9 +27,9 @@ export function Sidebar({ sesion, items, abierto, onCerrar, onLogout }: Props) {
       <div className={`sidebar-backdrop ${abierto ? "abierto" : ""}`} onClick={onCerrar} />
       <aside className={`sidebar ${abierto ? "abierto" : ""}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-mark">JDS</div>
+          <div className="sidebar-brand-mark">VC</div>
           <div>
-            <div className="sidebar-brand-name">VotaCoop</div>
+            <div className="sidebar-brand-name">VOTACOOP</div>
             <div className="sidebar-brand-org">{sesion.organizacion_nombre}</div>
           </div>
           <button className="sidebar-close" onClick={onCerrar} aria-label="Cerrar menú">

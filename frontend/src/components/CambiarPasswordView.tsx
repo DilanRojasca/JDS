@@ -45,7 +45,7 @@ export function CambiarPasswordView({ nombre, onCambiada }: Props) {
   return (
     <div className="login-shell">
       <form className="login-card" onSubmit={enviar}>
-        <div className="login-brand">VotaCoop</div>
+        <div className="login-brand">VOTACOOP</div>
         <p className="login-subtitle">
           Hola, {nombre}. Este es tu primer ingreso: define una contraseña propia antes de
           continuar. Tu documento deja de servir como contraseña una vez la definas.

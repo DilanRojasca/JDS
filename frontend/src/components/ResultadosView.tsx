@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { obtenerResultado, type ResultadoVotacion } from "../api";
+import { IconCheckCircle, IconCircleDashed } from "../icons";
 
 interface Props {
   votacionId: number;
   onVolver: () => void;
 }
 
-const COLORES_OPCION = ["#1f6b54", "#b3402c", "#8b8577", "#93501e", "#2c5f6f"];
+const COLORES_OPCION = ["#1d4ed8", "#11151c", "#1f6b45", "#8a5a12", "#5b6472"];
 
 export function ResultadosView({ votacionId, onVolver }: Props) {
   const [resultado, setResultado] = useState<ResultadoVotacion | null>(null);
@@ -62,15 +63,15 @@ export function ResultadosView({ votacionId, onVolver }: Props) {
           <div className="quorum-meter-label">
             {resultado.quorum_alcanzado ? (
               <>
-                <span className="quorum-icon">✓</span> Quórum alcanzado
+                <span className="quorum-icon"><IconCheckCircle width={15} height={15} /></span> Quórum alcanzado
               </>
             ) : (
               <>
-                <span className="quorum-icon">○</span> Quórum aún no alcanzado
+                <span className="quorum-icon"><IconCircleDashed width={15} height={15} /></span> Quórum aún no alcanzado
               </>
             )}
           </div>
-          <div className="quorum-meter-value">
+          <div className="quorum-meter-value num">
             {resultado.peso_total_votado.toFixed(2)}{" "}
             <span className="quorum-meter-value-muted">/ {resultado.quorum_requerido.toFixed(2)} requerido</span>
           </div>
@@ -85,17 +86,17 @@ export function ResultadosView({ votacionId, onVolver }: Props) {
       <div className="stat-row">
         <div className="stat-tile">
           <span className="stat-label">Miembros que votaron</span>
-          <span className="stat-value">
+          <span className="stat-value num">
             {resultado.miembros_votantes} <span className="stat-value-muted">/ {resultado.miembros_total}</span>
           </span>
         </div>
         <div className="stat-tile">
           <span className="stat-label">Participación ponderada</span>
-          <span className="stat-value">{porcentajePadron.toFixed(1)}%</span>
+          <span className="stat-value num">{porcentajePadron.toFixed(1)}%</span>
         </div>
         <div className="stat-tile">
           <span className="stat-label">Peso total del padrón</span>
-          <span className="stat-value">{resultado.peso_total_padron.toFixed(2)}</span>
+          <span className="stat-value num">{resultado.peso_total_padron.toFixed(2)}</span>
         </div>
       </div>
 
@@ -107,7 +108,7 @@ export function ResultadosView({ votacionId, onVolver }: Props) {
             <div key={op.opcion_id} className="opcion-resultado-row">
               <div className="opcion-resultado-header">
                 <span>{op.texto_opcion}</span>
-                <span className="opcion-resultado-meta">
+                <span className="opcion-resultado-meta num">
                   {op.peso.toFixed(2)} pts · {op.votos} voto{op.votos === 1 ? "" : "s"} · {pct.toFixed(0)}%
                 </span>
               </div>

@@ -38,7 +38,7 @@ export function LoginView({ onLogin, aviso }: Props) {
   return (
     <div className="login-shell">
       <form className="login-card" onSubmit={enviar}>
-        <div className="login-brand">VotaCoop</div>
+        <div className="login-brand">VOTACOOP</div>
         <p className="login-subtitle">Inicia sesión para participar en las votaciones.</p>
 
         {aviso && !error && <p className="aviso-text">{aviso}</p>}
@@ -125,7 +125,7 @@ function RecuperarPasswordView({ onVolver }: { onVolver: () => void }) {
   return (
     <div className="login-shell">
       <form className="login-card" onSubmit={enviar}>
-        <div className="login-brand">VotaCoop</div>
+        <div className="login-brand">VOTACOOP</div>
         <p className="login-subtitle">
           Indica tu nombre completo y tu número de documento. Si coinciden con un miembro
           registrado, podrás volver a entrar usando tu documento como contraseña temporal.

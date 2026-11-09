@@ -61,10 +61,10 @@ export function AuditoriaView() {
         <tbody>
           {eventos.map((e, i) => (
             <tr key={i}>
-              <td>{formatFecha(e.fecha)}</td>
+              <td className="num">{formatFecha(e.fecha)}</td>
               <td>{ETIQUETAS[e.accion] ?? e.accion}</td>
-              <td>{e.miembro_id ?? "sistema"}</td>
-              <td>{Object.entries(e.detalle).map(([k, v]) => `${k}: ${v}`).join(", ")}</td>
+              <td className="num">{e.miembro_id ?? "sistema"}</td>
+              <td className="num">{Object.entries(e.detalle).map(([k, v]) => `${k}: ${v}`).join(", ")}</td>
             </tr>
           ))}
         </tbody>

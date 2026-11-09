@@ -60,8 +60,8 @@ export function VotarView({ votacionId, miembro, onVolver }: Props) {
       <h2>{votacion.titulo}</h2>
       {votacion.descripcion && <p className="descripcion">{votacion.descripcion}</p>}
       <p className="meta">
-        Quórum requerido: {votacion.quorum_requerido.toFixed(2)} · Tu peso de voto:{" "}
-        {miembro.peso_voto.toFixed(2)} ({miembro.nombre})
+        Quórum requerido: <span className="num">{votacion.quorum_requerido.toFixed(2)}</span> · Tu peso de voto:{" "}
+        <span className="num">{miembro.peso_voto.toFixed(2)}</span> ({miembro.nombre})
       </p>
 
       {mensaje ? (

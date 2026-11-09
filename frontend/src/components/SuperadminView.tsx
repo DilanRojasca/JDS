@@ -96,7 +96,7 @@ export function SuperadminView() {
             <tbody>
               {organizaciones.map((o) => (
                 <tr key={o.organizacion_id}>
-                  <td>{o.organizacion_id}</td>
+                  <td className="num">{o.organizacion_id}</td>
                   <td>{o.nombre}</td>
                   <td>
                     <button className="link-button" onClick={() => verMiembros(o)}>
@@ -130,7 +130,7 @@ export function SuperadminView() {
                 {miembros.map((m) => (
                   <tr key={m.miembro_id}>
                     <td>{m.nombre}</td>
-                    <td>{m.peso_voto.toFixed(2)}</td>
+                    <td className="num">{m.peso_voto.toFixed(2)}</td>
                     <td>
                       <span className={`rol-badge rol-badge-${m.rol.toLowerCase()}`}>{m.rol}</span>
                     </td>

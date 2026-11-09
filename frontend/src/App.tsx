@@ -204,7 +204,7 @@ function App() {
           >
             <IconMenu />
           </button>
-          <span className="mobile-topbar-brand">VotaCoop</span>
+          <span className="mobile-topbar-brand">VOTACOOP</span>
         </div>
 
         <main className="app-main">

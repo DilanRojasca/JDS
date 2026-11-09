@@ -131,6 +131,7 @@ export function AdminPanelView({ miembro, onVotacionCreada }: Props) {
             <label htmlFor="quorum">Quórum requerido (suma de pesos)</label>
             <input
               id="quorum"
+              className="num"
               type="number"
               step="0.01"
               min="0.01"
@@ -215,6 +216,7 @@ export function AdminPanelView({ miembro, onVotacionCreada }: Props) {
             <label htmlFor="peso-voto">Peso de voto</label>
             <input
               id="peso-voto"
+              className="num"
               type="number"
               step="0.01"
               min="0.01"
