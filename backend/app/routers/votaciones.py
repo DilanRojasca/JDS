@@ -3,17 +3,19 @@ from sqlalchemy import Connection, text
 from sqlalchemy.exc import DBAPIError
 
 from app.db import get_connection
+from app.mongo import log_evento
 from app.schemas import (
     MiembroSesion,
     OpcionResultado,
     OpcionVoto,
     ResultadoVotacion,
+    VotacionCrear,
     VotacionDetalle,
     VotacionResumen,
     VotoConfirmacion,
     VotoCrear,
 )
-from app.security import get_current_member_activo
+from app.security import get_current_member_activo, require_admin
 
 router = APIRouter(prefix="/votaciones", tags=["votaciones"])
 
@@ -62,6 +64,118 @@ def listar_votaciones(
         )
         for row in rows
     ]
+
+
+@router.post("", response_model=VotacionDetalle, status_code=201)
+def crear_votacion(
+    datos: VotacionCrear,
+    conn: Connection = Depends(get_connection),
+    actual: MiembroSesion = Depends(require_admin),
+) -> VotacionDetalle:
+    with conn.begin():
+        result = conn.execute(
+            text(
+                """
+                INSERT INTO Votaciones
+                    (OrganizacionId, Titulo, Descripcion, QuorumRequerido, FechaApertura, FechaCierre, Estado)
+                OUTPUT INSERTED.VotacionId
+                VALUES (:org_id, :titulo, :descripcion, :quorum, :apertura, :cierre, 'Pendiente')
+                """
+            ),
+            {
+                "org_id": actual.organizacion_id,
+                "titulo": datos.titulo,
+                "descripcion": datos.descripcion,
+                "quorum": datos.quorum_requerido,
+                "apertura": datos.fecha_apertura,
+                "cierre": datos.fecha_cierre,
+            },
+        )
+        votacion_id = result.scalar_one()
+
+        opciones: list[OpcionVoto] = []
+        for texto_opcion in datos.opciones:
+            op_result = conn.execute(
+                text(
+                    """
+                    INSERT INTO OpcionesVoto (VotacionId, TextoOpcion)
+                    OUTPUT INSERTED.OpcionId
+                    VALUES (:votacion_id, :texto)
+                    """
+                ),
+                {"votacion_id": votacion_id, "texto": texto_opcion},
+            )
+            opciones.append(OpcionVoto(opcion_id=op_result.scalar_one(), texto_opcion=texto_opcion))
+
+    log_evento(
+        organizacion_id=actual.organizacion_id,
+        miembro_id=actual.miembro_id,
+        accion="crear_votacion",
+        detalle={"votacion_id": votacion_id, "titulo": datos.titulo},
+    )
+
+    return VotacionDetalle(
+        votacion_id=votacion_id,
+        titulo=datos.titulo,
+        descripcion=datos.descripcion,
+        estado="Pendiente",
+        fecha_apertura=datos.fecha_apertura,
+        fecha_cierre=datos.fecha_cierre,
+        quorum_requerido=datos.quorum_requerido,
+        opciones=opciones,
+    )
+
+
+@router.post("/{votacion_id}/cerrar", response_model=VotacionResumen)
+def cerrar_votacion(
+    votacion_id: int,
+    conn: Connection = Depends(get_connection),
+    actual: MiembroSesion = Depends(require_admin),
+) -> VotacionResumen:
+    """Cierre manual, anticipado al vencimiento de FechaCierre. El cierre por
+    vencimiento de la ventana de tiempo lo hace el scheduler (app/scheduler.py)."""
+    with conn.begin():
+        # Dentro del begin(): una consulta previa fuera de el abriria una
+        # transaccion implicita y conn.begin() fallaria (ver registrar_voto).
+        _exigir_votacion_de_mi_organizacion(conn, votacion_id, actual)
+        row = conn.execute(
+            text("SELECT Estado FROM Votaciones WHERE VotacionId = :votacion_id"),
+            {"votacion_id": votacion_id},
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Votación no encontrada")
+        if row["Estado"] == "Cerrada":
+            raise HTTPException(status_code=409, detail="La votación ya está cerrada")
+
+        conn.execute(
+            text("UPDATE Votaciones SET Estado = 'Cerrada' WHERE VotacionId = :votacion_id"),
+            {"votacion_id": votacion_id},
+        )
+        actualizada = conn.execute(
+            text(
+                """
+                SELECT VotacionId, Titulo, Estado, FechaApertura, FechaCierre, QuorumRequerido
+                FROM Votaciones WHERE VotacionId = :votacion_id
+                """
+            ),
+            {"votacion_id": votacion_id},
+        ).mappings().first()
+
+    log_evento(
+        organizacion_id=actual.organizacion_id,
+        miembro_id=actual.miembro_id,
+        accion="cerrar_votacion",
+        detalle={"votacion_id": votacion_id, "manual": True},
+    )
+
+    return VotacionResumen(
+        votacion_id=actualizada["VotacionId"],
+        titulo=actualizada["Titulo"],
+        estado=actualizada["Estado"],
+        fecha_apertura=actualizada["FechaApertura"],
+        fecha_cierre=actualizada["FechaCierre"],
+        quorum_requerido=actualizada["QuorumRequerido"],
+    )
 
 
 @router.get("/{votacion_id}", response_model=VotacionDetalle)
@@ -208,5 +322,12 @@ def registrar_voto(
         if "UQ_Voto_Miembro_Votacion" in detalle or "duplicate key" in detalle.lower():
             raise HTTPException(status_code=409, detail="Este miembro ya votó en esta votación") from exc
         raise HTTPException(status_code=500, detail="No se pudo registrar el voto") from exc
+
+    log_evento(
+        organizacion_id=actual.organizacion_id,
+        miembro_id=actual.miembro_id,
+        accion="votar",
+        detalle={"votacion_id": votacion_id, "opcion_id": voto.opcion_id},
+    )
 
     return VotoConfirmacion(mensaje=mensaje["Mensaje"] if mensaje else "Voto registrado exitosamente")

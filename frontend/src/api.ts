@@ -48,10 +48,13 @@ export interface Organizacion {
   nombre: string;
 }
 
+export type Rol = "Miembro" | "Administrador" | "Auditor" | "Superadministrador";
+
 export interface Miembro {
   miembro_id: number;
   nombre: string;
   peso_voto: number;
+  rol: Rol;
 }
 
 export interface MiembroSesion extends Miembro {
@@ -147,6 +150,13 @@ export async function login(nombre: string, password: string): Promise<LoginResp
 
 export const obtenerMe = () => apiFetch<MiembroSesion>("/auth/me");
 
+export const olvidePassword = (nombre: string, identificacion: string) =>
+  apiFetch<{ mensaje: string }>(
+    "/auth/olvide-password",
+    { method: "POST", body: JSON.stringify({ nombre, identificacion }) },
+    false,
+  );
+
 // Define la clave propia del miembro autenticado. Se usa tanto para salir
 // del estado "debe_cambiar_password" (primer login con el documento) como
 // para un cambio de clave voluntario mas adelante.
@@ -157,6 +167,13 @@ export const cambiarPassword = (nuevaPassword: string) =>
   });
 
 export const listarOrganizaciones = () => apiFetch<Organizacion[]>("/organizaciones");
+
+// Solo Superadministrador.
+export const crearOrganizacion = (nombre: string) =>
+  apiFetch<Organizacion>("/organizaciones", {
+    method: "POST",
+    body: JSON.stringify({ nombre }),
+  });
 
 export const listarMiembros = (organizacionId: number) =>
   apiFetch<Miembro[]>(`/organizaciones/${organizacionId}/miembros`);
@@ -175,3 +192,52 @@ export const registrarVoto = (votacionId: number, opcionId: number) =>
     method: "POST",
     body: JSON.stringify({ opcion_id: opcionId }),
   });
+
+// ---- Administración (solo rol Administrador) ----
+
+export interface VotacionCrear {
+  titulo: string;
+  descripcion?: string;
+  quorum_requerido: number;
+  fecha_apertura: string;
+  fecha_cierre: string;
+  opciones: string[];
+}
+
+export const crearVotacion = (datos: VotacionCrear) =>
+  apiFetch<VotacionDetalle>("/votaciones", {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+
+export const cerrarVotacion = (votacionId: number) =>
+  apiFetch<VotacionResumen>(`/votaciones/${votacionId}/cerrar`, { method: "POST" });
+
+export interface MiembroCrear {
+  identificacion: string;
+  nombre: string;
+  peso_voto: number;
+  rol?: Rol;
+}
+
+export const crearMiembro = (organizacionId: number, datos: MiembroCrear) =>
+  apiFetch<Miembro>(`/organizaciones/${organizacionId}/miembros`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+
+// ---- Auditoría (Administrador o Auditor) ----
+
+export interface EventoAuditoria {
+  accion: string;
+  miembro_id: number | null;
+  detalle: Record<string, unknown>;
+  fecha: string;
+}
+
+// organizacionId solo tiene efecto para el rol Superadministrador (ver
+// cualquier organizacion); el resto de roles siempre ven la suya.
+export const listarAuditoria = (organizacionId?: number) =>
+  apiFetch<EventoAuditoria[]>(
+    organizacionId ? `/auditoria?organizacion_id=${organizacionId}` : "/auditoria",
+  );

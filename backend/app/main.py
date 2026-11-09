@@ -1,15 +1,28 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.routers import auth, organizaciones, votaciones
+from app.config import settings
+from app.routers import auditoria, auth, organizaciones, votaciones
+from app.scheduler import detener_scheduler, iniciar_scheduler
 
 logger = logging.getLogger("uvicorn.error")
 
-app = FastAPI(title="VotaCoop API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.enable_scheduler:
+        iniciar_scheduler()
+    yield
+    if settings.enable_scheduler:
+        detener_scheduler()
+
+
+app = FastAPI(title="VotaCoop API", version="0.1.0", lifespan=lifespan)
 
 
 # Debe registrarse ANTES que CORS (queda por dentro de el). Asi, un error
@@ -42,6 +55,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(organizaciones.router)
 app.include_router(votaciones.router)
+app.include_router(auditoria.router)
 
 
 @app.get("/health")
